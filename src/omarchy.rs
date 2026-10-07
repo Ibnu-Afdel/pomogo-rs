@@ -121,13 +121,19 @@ pub fn print_omarchy_status() {
 /// otherwise, asks the running shell to load and enable it.
 pub fn install_plugin(enable: bool) -> Result<PathBuf, String> {
     let dir = plugin_dir();
-    fs::create_dir_all(&dir)
-        .map_err(|e| format!("failed to create {}: {}", dir.display(), e))?;
-    for (name, content) in PLUGIN_FILES {
-        let path = dir.join(name);
-        fs::write(&path, content).map_err(|e| format!("failed to write {}: {}", path.display(), e))?;
+    if dir.join(".git").exists() {
+        // Added with `omarchy plugin add`; writing into the checkout would
+        // block `omarchy plugin update` from fast-forwarding it.
+        println!("✔ Bar widget is a git checkout at {} (update it with `omarchy plugin update {}`)", dir.display(), PLUGIN_ID);
+    } else {
+        fs::create_dir_all(&dir)
+            .map_err(|e| format!("failed to create {}: {}", dir.display(), e))?;
+        for (name, content) in PLUGIN_FILES {
+            let path = dir.join(name);
+            fs::write(&path, content).map_err(|e| format!("failed to write {}: {}", path.display(), e))?;
+        }
+        println!("✔ Bar widget files written to {}", dir.display());
     }
-    println!("✔ Bar widget files written to {}", dir.display());
 
     if !command_exists("omarchy") {
         println!("· `omarchy` is not on PATH; enable the widget from Omarchy's plugin settings.");
@@ -164,7 +170,10 @@ pub fn uninstall_plugin() -> Result<(), String> {
         println!("✔ Removed from the bar");
     }
     let dir = plugin_dir();
-    if dir.exists() {
+    if dir.join(".git").exists() && command_exists("omarchy") {
+        run_quiet("omarchy", &["plugin", "remove", PLUGIN_ID, "--yes"])?;
+        println!("✔ Removed the git-managed widget with `omarchy plugin remove`");
+    } else if dir.exists() {
         fs::remove_dir_all(&dir).map_err(|e| format!("failed to remove {}: {}", dir.display(), e))?;
         println!("✔ Deleted {}", dir.display());
     } else {
