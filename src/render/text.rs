@@ -69,7 +69,54 @@ pub fn strip_ansi(s: &str) -> String {
     out
 }
 
+/// Cuts an ANSI-styled line down to `width` visible columns, keeping every
+/// escape sequence so colors stay balanced.
+pub fn clip_visible(s: &str, width: usize) -> String {
+    if visible_width(s) <= width {
+        return s.to_string();
+    }
+    let mut out = String::new();
+    let mut used = 0;
+    let mut in_escape = false;
+    for ch in s.chars() {
+        if ch == '\x1b' {
+            in_escape = true;
+            out.push(ch);
+            continue;
+        }
+        if in_escape {
+            out.push(ch);
+            if ch.is_ascii_alphabetic() {
+                in_escape = false;
+            }
+            continue;
+        }
+        let w = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if used + w > width {
+            continue;
+        }
+        used += w;
+        out.push(ch);
+    }
+    out
+}
+
 pub fn visible_width(s: &str) -> usize {
     strip_ansi(s).width()
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clip_visible_keeps_escapes() {
+        let s = "\x1b[31mhello\x1b[0m world";
+        let clipped = clip_visible(s, 3);
+        assert_eq!(strip_ansi(&clipped), "hel");
+        assert!(clipped.contains("\x1b[0m"));
+        assert_eq!(clip_visible("abc", 10), "abc");
+        assert_eq!(visible_width(&clip_visible("│ wide 🍅 text", 8)), 8);
+    }
+}

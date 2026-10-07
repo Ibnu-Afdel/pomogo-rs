@@ -59,6 +59,20 @@ pub fn retro_progress_bar(
     format!("{}{}", ansi_fg(filled_color, &filled), ansi_fg(empty_color, &empty))
 }
 
+/// Joins hint items with a separator, dropping trailing items (and finally
+/// tightening the separator) until the line fits in `width` columns.
+pub fn fit_hints(items: &[&str], width: usize) -> String {
+    for sep in ["  ·  ", " · "] {
+        for n in (1..=items.len()).rev() {
+            let line = items[..n].join(sep);
+            if visible_width(&line) <= width {
+                return line;
+            }
+        }
+    }
+    String::new()
+}
+
 pub fn center_text(s: &str, width: usize) -> String {
     let vis_w = visible_width(s);
     if vis_w >= width {
@@ -119,3 +133,17 @@ pub fn place_center(width: usize, height: usize, content: &str) -> String {
     out.join("\n")
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fit_hints_drops_items_to_fit() {
+        let items = ["s start", "space pause", "q quit"];
+        assert_eq!(fit_hints(&items, 80), "s start  ·  space pause  ·  q quit");
+        assert_eq!(fit_hints(&items, 30), "s start  ·  space pause");
+        assert_eq!(fit_hints(&items, 7), "s start");
+        assert_eq!(fit_hints(&items, 3), "");
+    }
+}

@@ -2,7 +2,7 @@
 
 use crate::render::bigclock::{ansi_bold_fg, ansi_fg, ansi_italic_fg, big_clock_rows};
 use crate::render::borders::{render_box, BorderStyle};
-use crate::render::widgets::{center_text, place_center, retro_progress_bar, session_dots};
+use crate::render::widgets::{center_text, fit_hints, place_center, retro_progress_bar, session_dots};
 use crate::render::{format_clock, phase_color, DisplayState, Frame};
 use crate::theme::Theme;
 
@@ -30,7 +30,10 @@ pub fn retro(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
 
     let hints = ansi_fg(
         muted,
-        "S START  ·  SPACE PAUSE  ·  N SKIP  ·  T TASK  ·  P PROJECT  ·  R RESET  ·  ? HELP  ·  Q QUIT",
+        &fit_hints(
+            &["S START", "SPACE PAUSE", "N SKIP", "T TASK", "P PROJECT", "R RESET", "? HELP", "Q QUIT"],
+            text_w,
+        ),
     );
 
     let mut lines = Vec::new();

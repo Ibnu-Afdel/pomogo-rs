@@ -27,7 +27,7 @@ pub fn dashboard(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let timer_text = format_clock(ds);
     let title = ansi_bold_fg(color, &ds.mode_label.to_uppercase());
     let clock = ansi_bold_fg(color, &timer_text);
-    let bar = progress_bar(ds.progress, width, th.progress_fill(), th.progress_track());
+    let bar = progress_bar(ds.progress, left_w, th.progress_fill(), th.progress_track());
 
     let mut meta = vec![
         meta_row("project", &ds.project, left_w, muted, txt),
