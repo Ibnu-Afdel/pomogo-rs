@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "pomogo.timer",
   "name": "PomoGo",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "author": "Ibnu Afdel",
   "description": "Live PomoGo focus timer for the Omarchy bar",
   "kinds": [

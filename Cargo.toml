@@ -1,6 +1,6 @@
 [package]
 name = "pomogo-rust"
-version = "3.0.0"
+version = "3.0.1"
 edition = "2021"
 authors = ["Ibnu Afdel"]
 description = "A sleek, distraction-free Pomodoro timer TUI for Linux, Omarchy, and developers"
