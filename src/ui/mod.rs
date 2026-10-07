@@ -41,7 +41,6 @@ use crate::theme::omarchy::omarchy_colors_mtime;
 use crate::theme::{self, Theme};
 use crate::timer::{RealClock, SessionPhase, SessionState};
 use crate::wellness::{break_tip, Nudge, Wellness};
-use crate::ui::keymap::KeyMap;
 use crate::ui::screens::{
     preset_duration, render_duration_picker, render_help, render_input, render_recap,
     render_restore_prompt, render_sound_picker, render_stats, RecapInfo,
@@ -65,7 +64,6 @@ pub struct App {
     pub theme: Theme,
     pub width: usize,
     pub height: usize,
-    pub keymap: KeyMap,
 
     pub notifier: Notifier,
     pub state_manager: Option<StateManager>,
@@ -183,7 +181,6 @@ impl App {
             theme: th,
             width: 80,
             height: 24,
-            keymap: KeyMap::default(),
             notifier,
             state_manager,
             db_store,
@@ -1152,7 +1149,7 @@ impl App {
         let rendered = if self.restore_pending {
             render_restore_prompt(self.width, self.height, &self.theme)
         } else if self.show_help {
-            render_help(self.width, self.height, &self.theme, &self.keymap.help_bindings())
+            render_help(self.width, self.height, &self.theme)
         } else if self.show_stats {
             let sessions = self.db_store.as_ref().and_then(|s| {
                 s.get_sessions(Utc::now() - Duration::days(365), Utc::now() + Duration::days(1)).ok()

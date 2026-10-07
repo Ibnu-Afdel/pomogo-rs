@@ -1,44 +1,49 @@
-// Help overlay modal screen.
+// Help overlay: key groups in two columns, or one when the terminal is narrow.
 
-use crate::render::bigclock::ansi_bold_fg;
+use crate::render::bigclock::{ansi_bold_fg, ansi_fg};
 use crate::render::borders::{render_box, BorderStyle};
-use crate::render::text::visible_width;
-use crate::render::widgets::place_center;
+use crate::render::widgets::{pad_line, place_center};
 use crate::theme::Theme;
+use crate::ui::keymap::{KeyGroup, KEY_GROUPS};
 
-#[derive(Debug, Clone)]
-pub struct HelpBinding {
-    pub keys: &'static str,
-    pub description: &'static str,
+const KEY_COL: usize = 7;
+const COLUMN_WIDTH: usize = 34;
+
+fn group_lines(group: &KeyGroup, th: &Theme) -> Vec<String> {
+    let mut lines = vec![ansi_bold_fg(th.text(), group.title)];
+    for (key, what) in group.keys {
+        lines.push(format!(
+            "{}{}",
+            pad_line(&ansi_bold_fg(th.accent(), key), KEY_COL),
+            ansi_fg(th.muted(), what)
+        ));
+    }
+    lines.push(String::new());
+    lines
 }
 
-pub fn render_help(width: usize, height: usize, th: &Theme, bindings: &[HelpBinding]) -> String {
-    let accent = th.accent();
-    let _muted = th.muted();
+pub fn render_help(width: usize, height: usize, th: &Theme) -> String {
+    let (left, right) = KEY_GROUPS.split_at(2);
+    let left: Vec<String> = left.iter().flat_map(|g| group_lines(g, th)).collect();
+    let right: Vec<String> = right.iter().flat_map(|g| group_lines(g, th)).collect();
 
-    let mut rows = Vec::new();
-    for b in bindings {
-        let key_str = ansi_bold_fg(accent, b.keys);
-        let pad_len = if visible_width(b.keys) < 14 {
-            14 - visible_width(b.keys)
-        } else {
-            1
-        };
-        rows.push(format!("{}{}{}", key_str, " ".repeat(pad_len), b.description));
+    let mut rows: Vec<String> = if width >= COLUMN_WIDTH * 2 + 10 {
+        (0..left.len().max(right.len()))
+            .map(|i| {
+                let l = left.get(i).cloned().unwrap_or_default();
+                let r = right.get(i).cloned().unwrap_or_default();
+                format!("{}{}", pad_line(&l, COLUMN_WIDTH), r)
+            })
+            .collect()
+    } else {
+        left.into_iter().chain(right).collect()
+    };
+    while rows.last().is_some_and(|r| r.trim().is_empty()) {
+        rows.pop();
     }
-
     rows.push(String::new());
-    rows.push(format!(
-        "\x1b[38;2;{};{};{}mSessions auto-restore after an unexpected close.\x1b[0m",
-        140, 140, 140
-    ));
-    rows.push(format!(
-        "\x1b[38;2;{};{};{}mPress ? or Esc to close this overlay.\x1b[0m",
-        140, 140, 140
-    ));
+    rows.push(ansi_fg(th.muted(), "Press ? or esc to close."));
 
-    let content = rows.join("\n");
-    let boxed = render_box(&content, accent, BorderStyle::Rounded, 3, 1);
+    let boxed = render_box(&rows.join("\n"), th.border(), BorderStyle::Rounded, 3, 1);
     place_center(width, height, &boxed)
 }
-

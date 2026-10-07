@@ -6,7 +6,7 @@ pub mod restore;
 pub mod sound;
 pub mod stats;
 
-pub use help::{render_help, HelpBinding};
+pub use help::render_help;
 pub use input::render_input;
 pub use picker::{preset_duration, render_duration_picker};
 pub use recap::{render_recap, RecapInfo};
