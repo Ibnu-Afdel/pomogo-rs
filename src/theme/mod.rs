@@ -5,7 +5,7 @@ pub mod omarchy;
 use std::collections::HashMap;
 use chrono::Local;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Theme {
     pub name: String,
     pub work: String,

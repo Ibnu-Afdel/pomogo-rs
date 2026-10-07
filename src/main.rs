@@ -110,7 +110,11 @@ enum Commands {
     /// Show detailed session history
     History,
     /// List all available color themes with swatches
-    Themes,
+    Themes {
+        /// Print every theme and its colors as JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Render a non-interactive terminal preview
     ScreenshotPreview {
         #[arg(long, default_value = "focus")]
@@ -252,7 +256,7 @@ fn main() {
         Some(Commands::Config { action }) => handle_config(action),
         Some(Commands::Stats { week, month }) => handle_stats(week, month),
         Some(Commands::History) => handle_history(),
-        Some(Commands::Themes) => handle_themes(),
+        Some(Commands::Themes { json }) => handle_themes(json),
         Some(Commands::ScreenshotPreview { layout, theme, scene, effects, width, height, zen }) => {
             let Some(mut ds) = sample_scene(&scene) else {
                 eprintln!("Unknown scene {:?}. Use ready, focus, reminder, break or deep.", scene);
@@ -403,8 +407,19 @@ fn handle_history() {
     }
 }
 
-fn handle_themes() {
+fn handle_themes(json: bool) {
     let themes = list_themes();
+    if json {
+        let all: Vec<_> = themes.iter().map(|name| get_theme(name)).collect();
+        match serde_json::to_string_pretty(&all) {
+            Ok(out) => println!("{}", out),
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                process::exit(1);
+            }
+        }
+        return;
+    }
     println!("Available Color Themes:");
     println!("-----------------------");
 
