@@ -9,9 +9,10 @@ use chrono::{DateTime, Duration, Local, Utc};
 use crossterm::{
     cursor,
     event::{self, Event as CEvent, KeyCode, KeyEvent, KeyModifiers},
-    execute,
+    execute, queue,
     terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+        disable_raw_mode, enable_raw_mode, BeginSynchronizedUpdate, Clear, ClearType,
+        EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen,
     },
 };
 
@@ -20,6 +21,7 @@ use crate::devinfo::{find_git_branch, get_tmux_session};
 use crate::integrations::is_session_locked;
 use crate::notify::{sound_profiles, Notifier};
 use crate::render::ambient::render_ambient;
+use crate::render::text::clip_visible;
 use crate::render::{
     resolve_effects_name, resolve_layout, resolve_layout_name, DisplayState, Frame,
 };
@@ -197,6 +199,14 @@ impl App {
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Leave the terminal usable if anything below panics.
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let _ = disable_raw_mode();
+            let _ = execute!(stdout(), cursor::Show, LeaveAlternateScreen);
+            default_hook(info);
+        }));
+
         enable_raw_mode()?;
         let mut stdout = stdout();
         execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
@@ -1004,9 +1014,20 @@ impl App {
             }
         };
 
-        // Clear screen and draw
-        execute!(out, cursor::MoveTo(0, 0))?;
-        write!(out, "{}", rendered)?;
+        // Raw mode does not translate "\n" into "\r\n", so position every row
+        // explicitly and clear whatever the previous frame left behind.
+        queue!(out, BeginSynchronizedUpdate)?;
+        let mut row = 0u16;
+        for line in rendered.split('\n').take(self.height.max(1)) {
+            queue!(out, cursor::MoveTo(0, row))?;
+            write!(out, "{}\x1b[0m", clip_visible(line.trim_end_matches('\r'), self.width))?;
+            queue!(out, Clear(ClearType::UntilNewLine))?;
+            row += 1;
+        }
+        if (row as usize) < self.height {
+            queue!(out, cursor::MoveTo(0, row), Clear(ClearType::FromCursorDown))?;
+        }
+        queue!(out, EndSynchronizedUpdate)?;
         out.flush()?;
 
         Ok(())
