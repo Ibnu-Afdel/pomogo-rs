@@ -77,7 +77,7 @@ fn default_work_duration() -> usize { 25 }
 fn default_short_break_duration() -> usize { 5 }
 fn default_long_break_duration() -> usize { 15 }
 fn default_sessions_before_long_break() -> usize { 4 }
-fn default_theme() -> String { "tokyo-night".to_string() }
+fn default_theme() -> String { "auto".to_string() }
 fn default_layout() -> String { "classic".to_string() }
 fn default_effects() -> String { "none".to_string() }
 fn default_sound_start() -> String { "message-new-instant".to_string() }
@@ -122,7 +122,7 @@ impl Default for Config {
             short_break_duration: 5,
             long_break_duration: 15,
             sessions_before_long_break: 4,
-            theme: "tokyo-night".to_string(),
+            theme: default_theme(),
             layout: "classic".to_string(),
             effects: "none".to_string(),
             notifications_enabled: true,
@@ -329,10 +329,11 @@ short_break_duration = 5
 long_break_duration = 15
 sessions_before_long_break = 4
 
-# Theming: "tokyo-night", "omarchy", "catppuccin", "gruvbox", "rose-pine",
+# Theming: "auto", "omarchy", "tokyo-night", "catppuccin", "gruvbox", "rose-pine",
 # "nord", "everforest", "dracula", "kanagawa", "random", "daily"
-# Note: In Omarchy Linux, "omarchy" dynamically reads ~/.local/state/omarchy/current/theme/colors.toml!
-theme = "tokyo-night"
+# "auto" follows the active Omarchy theme (and its live changes) on Omarchy,
+# and uses tokyo-night everywhere else. Run `pomogo themes` for the full list.
+theme = "auto"
 
 # Layout: "classic", "minimal", "centered", "compact", "retro", "dashboard",
 # "monolith", "tinybar", "terminal-rice", "focus-stack", "command-center", "random", "daily"

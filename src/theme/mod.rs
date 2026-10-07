@@ -449,9 +449,12 @@ pub fn get(name: &str) -> Theme {
 }
 
 pub fn resolve_theme_name(configured: &str) -> String {
-    // If configured is empty or "auto", and we are in Omarchy, default to "omarchy"
-    if (configured.is_empty() || configured == "auto") && omarchy::is_omarchy_environment() {
-        return "omarchy".to_string();
+    // "auto" follows the desktop theme on Omarchy and falls back to Tokyo Night elsewhere.
+    if configured.is_empty() || configured == "auto" {
+        if omarchy::omarchy_colors_file_path().is_some() {
+            return "omarchy".to_string();
+        }
+        return "tokyo-night".to_string();
     }
 
     if configured == "random" {

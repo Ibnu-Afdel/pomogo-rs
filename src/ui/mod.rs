@@ -3,7 +3,7 @@ pub mod screens;
 
 use std::io::{stdout, Write};
 use std::process::Command;
-use std::time::{Duration as StdDuration, Instant};
+use std::time::{Duration as StdDuration, Instant, SystemTime};
 
 use chrono::{DateTime, Duration, Local, Utc};
 use crossterm::{
@@ -31,6 +31,7 @@ use crate::statefile::StateManager;
 use crate::stats::calculate as calculate_stats;
 use crate::store::models::{BlockStore, DbSession};
 use crate::store::Store;
+use crate::theme::omarchy::omarchy_colors_mtime;
 use crate::theme::{self, Theme};
 use crate::timer::{RealClock, SessionPhase, SessionState};
 use crate::ui::keymap::KeyMap;
@@ -96,6 +97,8 @@ pub struct App {
     pub paused_by_lock: bool,
     pub last_lock_check: Instant,
     pub recap_info: Option<RecapInfo>,
+    /// Last seen mtime of Omarchy's colors.toml, for following `omarchy theme set`.
+    pub omarchy_palette_mtime: Option<SystemTime>,
 }
 
 impl App {
@@ -195,6 +198,7 @@ impl App {
             paused_by_lock: false,
             last_lock_check: Instant::now(),
             recap_info: None,
+            omarchy_palette_mtime: omarchy_colors_mtime(),
         }
     }
 
@@ -274,6 +278,7 @@ impl App {
             if last_tick.elapsed() >= StdDuration::from_secs(1) {
                 last_tick = Instant::now();
                 self.tick_count += 1;
+                self.follow_omarchy_theme();
 
                 if self.runner.timer.is_running && !self.runner.timer.is_paused {
                     let prev_phase = self.runner.timer.phase;
@@ -708,6 +713,18 @@ impl App {
         self.selected_mode = Mode::Deep;
         self.deep_duration = total;
         self.set_status(&format!("Deep Focus: {} min block", total.num_minutes()));
+    }
+
+    /// Reloads the palette when the Omarchy theme changes underneath us.
+    fn follow_omarchy_theme(&mut self) {
+        if self.current_theme_name != "omarchy" {
+            return;
+        }
+        let mtime = omarchy_colors_mtime();
+        if mtime != self.omarchy_palette_mtime {
+            self.omarchy_palette_mtime = mtime;
+            self.theme = theme::get("omarchy");
+        }
     }
 
     fn cycle_theme(&mut self) {
