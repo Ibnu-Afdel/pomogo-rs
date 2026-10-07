@@ -23,6 +23,7 @@ use pomogo_rust::store::Store;
 use pomogo_rust::theme::{get as get_theme, list as list_themes, resolve_theme_name};
 use pomogo_rust::timer::SessionPhase;
 use pomogo_rust::ui::App;
+use pomogo_rust::wellness::{break_tip, Nudge};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -112,10 +113,13 @@ enum Commands {
     Themes,
     /// Render a non-interactive terminal preview
     ScreenshotPreview {
-        #[arg(long, default_value = "monolith")]
+        #[arg(long, default_value = "focus")]
         layout: String,
-        #[arg(long, default_value = "daily")]
+        #[arg(long, default_value = "auto")]
         theme: String,
+        /// Moment to show: ready, focus, reminder, break or deep
+        #[arg(long, default_value = "focus")]
+        scene: String,
         #[arg(long, default_value = "none")]
         effects: String,
         #[arg(long, default_value_t = 80)]
@@ -249,8 +253,13 @@ fn main() {
         Some(Commands::Stats { week, month }) => handle_stats(week, month),
         Some(Commands::History) => handle_history(),
         Some(Commands::Themes) => handle_themes(),
-        Some(Commands::ScreenshotPreview { layout, theme, effects, width, height, zen }) => {
-            handle_screenshot_preview(&layout, &theme, &effects, width, height, zen);
+        Some(Commands::ScreenshotPreview { layout, theme, scene, effects, width, height, zen }) => {
+            let Some(mut ds) = sample_scene(&scene) else {
+                eprintln!("Unknown scene {:?}. Use ready, focus, reminder, break or deep.", scene);
+                process::exit(1);
+            };
+            ds.zen = zen;
+            handle_screenshot_preview(&layout, &theme, &effects, width, height, ds);
         }
         Some(Commands::Recap) => handle_recap(),
         Some(Commands::Status { format }) => handle_status(&format),
@@ -408,13 +417,72 @@ fn handle_themes() {
     }
 }
 
+/// A believable moment of a focus day, for screenshots and the website.
+fn sample_scene(scene: &str) -> Option<DisplayState> {
+    let mut ds = DisplayState {
+        mode_label: "Writing".to_string(),
+        project: "PomoGo".to_string(),
+        task: "write the release notes".to_string(),
+        phase_kind: SessionPhase::Work,
+        segment_remaining: Duration::minutes(18) + Duration::seconds(32),
+        progress: 0.26,
+        segment_index: 2,
+        segment_count: 4,
+        running: true,
+        hints_visibility: true,
+        git_branch: "release/4.0".to_string(),
+        today_focus: Duration::minutes(155),
+        daily_goal: Duration::minutes(240),
+        streak_days: 6,
+        water_today: 3,
+        next_up: "break in 19m  ·  eyes in 7m".to_string(),
+        hints: "enter pause  ·  n skip  ·  t task  ·  w water  ·  tab stats  ·  ? keys".to_string(),
+        ..Default::default()
+    };
+    match scene {
+        "focus" => {}
+        "ready" => {
+            ds.running = false;
+            ds.idle = true;
+            ds.segment_remaining = Duration::minutes(25);
+            ds.progress = 0.0;
+            ds.next_up = "press enter to start a 25-minute focus".to_string();
+            ds.hints = "enter start  ·  t task  ·  p project  ·  d deep focus  ·  tab stats  ·  ? keys".to_string();
+        }
+        "reminder" => {
+            let n = Nudge::Water;
+            ds.nudge = Some((n.glyph().to_string(), n.title().to_string(), n.message().to_string()));
+            ds.segment_remaining = Duration::minutes(11) + Duration::seconds(4);
+            ds.progress = 0.56;
+            ds.hints = "enter pause  ·  n skip  ·  w water  ·  esc dismiss  ·  ? keys".to_string();
+        }
+        "break" => {
+            ds.phase_kind = SessionPhase::ShortBreak;
+            ds.segment_remaining = Duration::minutes(3) + Duration::seconds(41);
+            ds.progress = 0.27;
+            ds.today_focus = Duration::minutes(180);
+            ds.break_tip = break_tip(false, 0).to_string();
+            ds.next_up = "focus resumes in 4m".to_string();
+            ds.hints = "enter pause  ·  n skip  ·  w water  ·  tab stats  ·  ? keys".to_string();
+        }
+        "deep" => {
+            ds.block_remaining = Duration::hours(2) + Duration::minutes(12) + Duration::seconds(9);
+            ds.progress = 0.42;
+            ds.task = "refactor the session engine".to_string();
+        }
+        _ => return None,
+    }
+    ds.status_message = ds.next_up.clone();
+    Some(ds)
+}
+
 fn handle_screenshot_preview(
     layout_flag: &str,
     theme_flag: &str,
     effects_flag: &str,
     width: usize,
     height: usize,
-    zen: bool,
+    mut ds: DisplayState,
 ) {
     if width < 40 || height < 10 {
         eprintln!("Error: preview size must be at least 40x10");
@@ -428,37 +496,8 @@ fn handle_screenshot_preview(
     let th = get_theme(&resolved_th);
     let frame = Frame { width, height };
     let (l_name, layout_fn) = resolve_layout(&resolved_ly, frame.width, frame.height);
-
-    let ds = DisplayState {
-        mode_label: "Building".to_string(),
-        project: "PomoGo".to_string(),
-        task: "refine terminal focus".to_string(),
-        phase_kind: SessionPhase::Work,
-        segment_remaining: Duration::minutes(18) + Duration::seconds(32),
-        block_remaining: Duration::hours(2) + Duration::minutes(12) + Duration::seconds(9),
-        progress: 0.42,
-        segment_index: 2,
-        segment_count: 4,
-        running: true,
-        paused: false,
-        idle: false,
-        status_message: "focus · break in 19m".to_string(),
-        hints_visibility: true,
-        theme_name: resolved_th,
-        layout_name: l_name.to_string(),
-        zen,
-        git_branch: "feature/focus-polish".to_string(),
-        tmux_session: "work".to_string(),
-        today_focus: Duration::minutes(155),
-        daily_goal: Duration::minutes(240),
-        streak_days: 6,
-        water_today: 3,
-        next_up: "break in 19m  ·  eyes in 7m".to_string(),
-        nudge: None,
-        break_tip: String::new(),
-        hints: "enter pause  ·  n skip  ·  t task  ·  w water  ·  tab stats  ·  ? keys".to_string(),
-        toast: String::new(),
-    };
+    ds.theme_name = resolved_th;
+    ds.layout_name = l_name.to_string();
 
     let rendered = layout_fn(&ds, &th, &frame);
     print!("{}", render_ambient(&resolved_eff, 42, frame.width, frame.height, &th, &rendered));
