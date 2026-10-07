@@ -314,12 +314,18 @@ impl Config {
         (cfg, project, sound_event)
     }
 
-    pub fn write_default() -> Result<PathBuf, String> {
+    pub fn write_default(force: bool) -> Result<PathBuf, String> {
         let dir = xdg_config_dir();
         fs::create_dir_all(&dir)
             .map_err(|e| format!("failed to create config directory {}: {}", dir.display(), e))?;
 
         let file = config_file_path();
+        if file.exists() && !force {
+            return Err(format!(
+                "{} already exists (use --force to overwrite it)",
+                file.display()
+            ));
+        }
         let default_content = r#"# PomoGo Configuration File
 # Location: ~/.config/pomogo/config.toml
 

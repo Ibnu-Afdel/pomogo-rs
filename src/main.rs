@@ -187,7 +187,11 @@ enum Commands {
 #[derive(Subcommand)]
 enum ConfigAction {
     /// Create a default config file
-    Init,
+    Init {
+        /// Overwrite an existing config file
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -278,7 +282,7 @@ fn handle_version() {
 
 fn handle_config(action: ConfigAction) {
     match action {
-        ConfigAction::Init => match Config::write_default() {
+        ConfigAction::Init { force } => match Config::write_default(force) {
             Ok(path) => println!("Config file created at: {}", path.display()),
             Err(e) => {
                 eprintln!("Error: {}", e);
