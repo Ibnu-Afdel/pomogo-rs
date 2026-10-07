@@ -42,8 +42,25 @@ BarWidget {
     return Math.max(0, stored || 0)
   }
 
+  // A body reminder from the TUI (eyes, water, stretch), if one is showing.
+  readonly property string nudge: alive && pomo.nudge ? String(pomo.nudge) : ""
+  readonly property var nudgeGlyphs: ({ eyes: "󰈈", water: "󰖌", stretch: "󰖃" })
+  readonly property var nudgeTitles: ({ eyes: "Rest your eyes", water: "Drink some water", stretch: "Stand up and stretch" })
+
   // Nerd Font glyphs, matching the rest of the Omarchy bar.
-  readonly property string glyph: idle ? "󰔛" : paused ? "󰏤" : onBreak ? "󰅶" : "󰔟"
+  readonly property string glyph: nudge !== "" && nudgeGlyphs[nudge] ? nudgeGlyphs[nudge]
+    : idle ? "󰔛" : paused ? "󰏤" : onBreak ? "󰅶" : "󰔟"
+
+  function hm(secs) {
+    var mins = Math.floor(Math.max(0, secs || 0) / 60)
+    var h = Math.floor(mins / 60)
+    var m = mins % 60
+    return h === 0 ? m + "m" : m === 0 ? h + "h" : h + "h " + m + "m"
+  }
+
+  readonly property string todayText: alive && pomo.daily_goal_secs > 0
+    ? "Today: " + hm(pomo.today_focus_secs) + " of " + hm(pomo.daily_goal_secs)
+    : alive && pomo.today_focus_secs > 0 ? "Today: " + hm(pomo.today_focus_secs) : ""
 
   readonly property string clockText: {
     var s = remainingSecs
@@ -68,11 +85,14 @@ BarWidget {
 
   readonly property string tooltip: {
     if (!alive) return ""
-    if (idle) return "PomoGo is ready\nRight click to start"
+    if (idle) return ["PomoGo is ready", todayText, "Right click to start"].filter(function(l) { return l !== "" }).join("\n")
     var phase = pomo.session_type === "work" ? "Focus" : pomo.session_type === "long_break" ? "Long break" : "Break"
-    var lines = [phase + (paused ? " (paused)" : "") + " · " + clockText + " left"]
+    var lines = []
+    if (nudge !== "" && nudgeTitles[nudge]) lines.push(nudgeTitles[nudge])
+    lines.push(phase + (paused ? " (paused)" : "") + " · " + clockText + " left")
     if (pomo.project_name) lines.push("Project: " + pomo.project_name)
     if (taskText !== "") lines.push("Task: " + taskText)
+    if (todayText !== "") lines.push(todayText)
     lines.push("Click to open · right click to " + (paused ? "resume" : "pause") + " · middle click to skip")
     return lines.join("\n")
   }

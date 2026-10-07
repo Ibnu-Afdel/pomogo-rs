@@ -4,8 +4,10 @@ An [omarchy-shell](https://omarchy.org/) bar widget for
 [PomoGo](https://github.com/Ibnu-Afdel/pomogo-rs), the terminal Pomodoro and
 deep-focus timer.
 
-It shows the running segment's countdown, dims while paused and hides when
-PomoGo is closed.
+It shows the running segment's countdown, dims while paused, switches its icon
+when PomoGo asks you to rest your eyes, drink water or stretch, and hides when
+PomoGo is closed. The tooltip shows the task and today's progress toward your
+daily focus goal.
 
 - click: open or focus PomoGo
 - right click: start, pause or resume
