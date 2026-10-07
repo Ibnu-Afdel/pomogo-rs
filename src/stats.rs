@@ -128,7 +128,7 @@ pub fn calculate(
         let mut check_d = start_d;
         while completed_per_day.get(&check_d).copied().unwrap_or(0) > 0 {
             cur += 1;
-            check_d = check_d - Duration::days(1);
+            check_d -= Duration::days(1);
         }
         stats.current_streak = cur;
     }
@@ -141,16 +141,8 @@ pub fn calculate(
 
         for &date in completed_per_day.keys() {
             match prev_date {
-                Some(prev) => {
-                    if date == prev + Duration::days(1) {
-                        run += 1;
-                    } else {
-                        run = 1;
-                    }
-                }
-                None => {
-                    run = 1;
-                }
+                Some(prev) if date == prev + Duration::days(1) => run += 1,
+                _ => run = 1,
             }
             if run > best {
                 best = run;

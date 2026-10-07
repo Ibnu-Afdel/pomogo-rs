@@ -10,13 +10,7 @@ pub fn centered(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let muted = th.muted();
     let txt_col = th.text();
 
-    let mut text_w = if f.width > 6 { f.width - 6 } else { 40 };
-    if text_w > 70 {
-        text_w = 70;
-    }
-    if text_w < 40 {
-        text_w = 40;
-    }
+    let text_w = (if f.width > 6 { f.width - 6 } else { 40 }).clamp(40, 70);
 
     let clock_str = format_clock(ds);
     let clock_rows = big_clock_rows(&clock_str, color);

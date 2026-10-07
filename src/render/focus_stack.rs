@@ -13,13 +13,7 @@ pub fn focus_stack(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let txt = th.text();
     let border = th.border();
 
-    let mut width = if f.width > 8 { f.width - 8 } else { 44 };
-    if width > 72 {
-        width = 72;
-    }
-    if width < 44 {
-        width = 44;
-    }
+    let width = (if f.width > 8 { f.width - 8 } else { 44 }).clamp(44, 72);
 
     let clock_str = format_clock(ds);
     let left = ansi_bold_fg(color, &clock_str);

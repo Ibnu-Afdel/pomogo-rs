@@ -10,13 +10,7 @@ pub fn minimal(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let muted = th.muted();
     let txt_col = th.text();
 
-    let mut text_w = if f.width > 4 { f.width - 4 } else { 30 };
-    if text_w > 60 {
-        text_w = 60;
-    }
-    if text_w < 30 {
-        text_w = 30;
-    }
+    let text_w = (if f.width > 4 { f.width - 4 } else { 30 }).clamp(30, 60);
 
     let clock_str = format_clock(ds);
     let timer_disp = ansi_bold_fg(color, &clock_str);

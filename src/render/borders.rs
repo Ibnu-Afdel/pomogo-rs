@@ -102,7 +102,7 @@ pub fn render_box(
 
     for line in lines {
         let vis_w = visible_width(line);
-        let right_pad = if max_w >= vis_w { max_w - vis_w } else { 0 };
+        let right_pad = max_w.saturating_sub(vis_w);
         let padded_line = format!(
             "{}{}{}{}{}",
             v_border,

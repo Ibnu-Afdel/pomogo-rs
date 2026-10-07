@@ -11,13 +11,7 @@ pub fn compact(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let muted = th.muted();
     let txt_col = th.text();
 
-    let mut text_w = if f.width > 4 { f.width - 4 } else { 30 };
-    if text_w > 60 {
-        text_w = 60;
-    }
-    if text_w < 30 {
-        text_w = 30;
-    }
+    let text_w = (if f.width > 4 { f.width - 4 } else { 30 }).clamp(30, 60);
 
     let clock_str = format_clock(ds);
     let timer_disp = ansi_bold_fg(color, &clock_str);
@@ -58,12 +52,13 @@ pub fn compact(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
 
     let bar = progress_bar(ds.progress, text_w, th.progress_fill(), th.progress_track());
 
-    let mut lines = Vec::new();
-    lines.push(String::new());
-    lines.push(center_text(&status_parts.join(sep), text_w));
-    lines.push(String::new());
-    lines.push(bar);
-    lines.push(String::new());
+    let lines = [
+        String::new(),
+        center_text(&status_parts.join(sep), text_w),
+        String::new(),
+        bar,
+        String::new(),
+    ];
 
     place_center(f.width, f.height, &lines.join("\n"))
 }

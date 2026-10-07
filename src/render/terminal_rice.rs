@@ -13,13 +13,7 @@ pub fn terminal_rice(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let border = th.border();
     let txt = th.text();
 
-    let mut width = if f.width > 10 { f.width - 10 } else { 46 };
-    if width > 72 {
-        width = 72;
-    }
-    if width < 46 {
-        width = 46;
-    }
+    let width = (if f.width > 10 { f.width - 10 } else { 46 }).clamp(46, 72);
 
     let rail = ansi_fg(border, &"─".repeat(width));
     let header = center_text(

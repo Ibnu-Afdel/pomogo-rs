@@ -445,7 +445,7 @@ impl App {
                     }
 
                     if let Err(e) = self.runner.start(&clock) {
-                        self.set_status(&e.to_string());
+                        self.set_status(e);
                     } else {
                         self.run_hook_for_transition(self.runner.timer.phase);
                         self.write_state();
@@ -609,13 +609,12 @@ impl App {
                 self.selected_sound_idx = (self.selected_sound_idx + 1) % profiles.len();
             }
             KeyCode::Char(' ') => {
-                if self.selected_sound_idx < profiles.len() {
-                    self.notifier.preview_sound_event(profiles[self.selected_sound_idx].start_event);
+                if let Some(p) = profiles.get(self.selected_sound_idx) {
+                    self.notifier.preview_sound_event(p.start_event);
                 }
             }
             KeyCode::Enter => {
-                if self.selected_sound_idx < profiles.len() {
-                    let p = &profiles[self.selected_sound_idx];
+                if let Some(p) = profiles.get(self.selected_sound_idx) {
                     self.cfg.sound_start_event = p.start_event.to_string();
                     self.cfg.sound_end_event = p.end_event.to_string();
                     self.notifier.set_sound_events(p.start_event.to_string(), p.end_event.to_string());
@@ -1005,11 +1004,7 @@ impl App {
                     self.height,
                     &self.theme,
                     self.selected_duration_idx,
-                    self.cfg.deep_focus_default_duration_as_duration(),
-                    self.cfg.deep_focus_work_duration_as_duration(),
-                    self.cfg.deep_focus_short_break_duration_as_duration(),
-                    self.cfg.deep_focus_long_break_duration_as_duration(),
-                    self.cfg.deep_focus_sessions_before_long_break(),
+                    &self.cfg,
                 ),
                 InputMode::SoundPicker => {
                     render_sound_picker(self.width, self.height, &self.theme, self.selected_sound_idx, &sound_profiles())

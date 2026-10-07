@@ -13,13 +13,7 @@ pub fn dashboard(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let txt = th.text();
     let border = th.border();
 
-    let mut width = if f.width > 10 { f.width - 10 } else { 50 };
-    if width > 76 {
-        width = 76;
-    }
-    if width < 50 {
-        width = 50;
-    }
+    let width = (if f.width > 10 { f.width - 10 } else { 50 }).clamp(50, 76);
 
     let left_w = width / 2 - 2;
     let right_w = width - left_w - 3;
@@ -38,13 +32,11 @@ pub fn dashboard(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
         meta.push(meta_row("status", &ds.status_message, left_w, muted, txt));
     }
 
-    let block_lines = vec![
-        ansi_fg(muted, "FOCUS"),
+    let block_lines = [ansi_fg(muted, "FOCUS"),
         title,
         clock,
         String::new(),
-        bar,
-    ];
+        bar];
 
     // Combine left and right columns with divider
     let max_lines = block_lines.len().max(meta.len());
@@ -59,10 +51,10 @@ pub fn dashboard(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
         let right_part = if i < meta.len() { &meta[i] } else { "" };
 
         let vis_left = visible_width(left_part);
-        let pad_l = if left_w >= vis_left { left_w - vis_left } else { 0 };
+        let pad_l = left_w.saturating_sub(vis_left);
 
         let vis_right = visible_width(right_part);
-        let pad_r = if right_w >= vis_right { right_w - vis_right } else { 0 };
+        let pad_r = right_w.saturating_sub(vis_right);
 
         let row = format!(
             "{}{}{}{}{}{}",

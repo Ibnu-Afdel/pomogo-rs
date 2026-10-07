@@ -11,13 +11,7 @@ pub fn classic(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let muted = th.muted();
     let txt_col = th.text();
 
-    let mut text_w = if f.width > 12 { f.width - 12 } else { 34 };
-    if text_w > 68 {
-        text_w = 68;
-    }
-    if text_w < 34 {
-        text_w = 34;
-    }
+    let text_w = (if f.width > 12 { f.width - 12 } else { 34 }).clamp(34, 68);
 
     let clock_str = format_clock(ds);
     let clock_rows = big_clock_rows(&clock_str, color);

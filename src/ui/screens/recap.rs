@@ -23,13 +23,7 @@ pub fn render_recap(width: usize, height: usize, th: &Theme, info: &RecapInfo) -
     let txt_col = th.text();
     let border_col = th.border();
 
-    let mut text_w = if width > 12 { width - 12 } else { 34 };
-    if text_w > 50 {
-        text_w = 50;
-    }
-    if text_w < 34 {
-        text_w = 34;
-    }
+    let text_w = (if width > 12 { width - 12 } else { 34 }).clamp(34, 50);
 
     let title = ansi_bold_fg(accent_col, "✦ FOCUS CYCLE COMPLETE ✦");
     let tone = ansi_fg(muted_col, recap_tone(info));

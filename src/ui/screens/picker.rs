@@ -1,6 +1,7 @@
 // Deep Focus duration selection screen.
 
 use chrono::Duration;
+use crate::config::Config;
 use crate::render::bigclock::{ansi_bold_fg, ansi_fg};
 use crate::render::borders::{render_box, BorderStyle};
 use crate::render::widgets::place_center;
@@ -11,22 +12,19 @@ pub fn render_duration_picker(
     height: usize,
     th: &Theme,
     selected_idx: usize,
-    default_duration: Duration,
-    work_duration: Duration,
-    short_break: Duration,
-    long_break: Duration,
-    sessions_before_long: usize,
+    cfg: &Config,
 ) -> String {
+    let default_duration = cfg.deep_focus_default_duration_as_duration();
     let color = th.accent();
     let muted = th.muted();
 
     let rhythm = format!(
         "{} block · {}/{}/{} rhythm every {}",
         format_dur(default_duration),
-        format_dur(work_duration),
-        format_dur(short_break),
-        format_dur(long_break),
-        sessions_before_long,
+        format_dur(cfg.deep_focus_work_duration_as_duration()),
+        format_dur(cfg.deep_focus_short_break_duration_as_duration()),
+        format_dur(cfg.deep_focus_long_break_duration_as_duration()),
+        cfg.deep_focus_sessions_before_long_break(),
     );
 
     let options = [

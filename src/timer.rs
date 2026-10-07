@@ -88,7 +88,7 @@ impl MockClock {
     }
 
     pub fn advance(&mut self, d: Duration) {
-        self.current = self.current + d;
+        self.current += d;
     }
 }
 
@@ -305,7 +305,7 @@ impl Session {
         if !self.is_running {
             return;
         }
-        self.remaining_time = self.remaining_time + d;
+        self.remaining_time += d;
         if !self.is_paused {
             if let Some(ends) = self.ends_at {
                 self.ends_at = Some(ends + d);
@@ -350,8 +350,8 @@ mod tests {
     fn test_new_session() {
         let s = Session::new(Duration::minutes(25), Duration::minutes(5), Duration::minutes(15), 4);
         assert_eq!(s.state, SessionState::Idle);
-        assert_eq!(s.is_running, false);
-        assert_eq!(s.is_paused, false);
+        assert!(!s.is_running);
+        assert!(!s.is_paused);
         assert_eq!(s.session_count, 0);
         assert_eq!(s.sessions_until_long_break, 4);
     }
@@ -363,26 +363,26 @@ mod tests {
 
         assert!(s.start(&clock).is_ok());
         assert_eq!(s.state, SessionState::Work);
-        assert_eq!(s.is_running, true);
+        assert!(s.is_running);
         assert_eq!(s.remaining_time, Duration::minutes(25));
 
         // Advance 5 minutes
         clock.advance(Duration::minutes(5));
-        assert_eq!(s.tick(&clock), false);
+        assert!(!s.tick(&clock));
         assert_eq!(s.remaining_time, Duration::minutes(20));
 
         // Pause
         assert!(s.pause(&clock).is_ok());
-        assert_eq!(s.is_paused, true);
+        assert!(s.is_paused);
 
         // Advance while paused
         clock.advance(Duration::minutes(10));
         assert!(s.resume(&clock).is_ok());
-        assert_eq!(s.is_paused, false);
+        assert!(!s.is_paused);
         assert_eq!(s.remaining_time, Duration::minutes(20));
         // Advance 20 minutes -> complete
         clock.advance(Duration::minutes(20));
-        assert_eq!(s.tick(&clock), true);
+        assert!(s.tick(&clock));
         assert_eq!(s.state, SessionState::ShortBreak);
         assert_eq!(s.session_count, 1);
         assert_eq!(s.sessions_until_long_break, 3);
@@ -410,8 +410,8 @@ mod tests {
 
         s.reset();
         assert_eq!(s.state, SessionState::Idle);
-        assert_eq!(s.is_running, false);
-        assert_eq!(s.is_paused, false);
+        assert!(!s.is_running);
+        assert!(!s.is_paused);
     }
 
     #[test]
@@ -435,14 +435,14 @@ mod tests {
             assert_eq!(s.state, SessionState::Work);
             // Work phase finishes
             clock.advance(Duration::minutes(25));
-            assert_eq!(s.tick(&clock), true);
+            assert!(s.tick(&clock));
 
             if i < 4 {
                 assert_eq!(s.state, SessionState::ShortBreak);
                 // Start and finish ShortBreak
                 s.start(&clock).unwrap();
                 clock.advance(Duration::minutes(5));
-                assert_eq!(s.tick(&clock), true);
+                assert!(s.tick(&clock));
                 assert_eq!(s.state, SessionState::Work);
             } else {
                 assert_eq!(s.state, SessionState::LongBreak);

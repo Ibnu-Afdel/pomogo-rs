@@ -561,7 +561,7 @@ mod tests {
 
         store.archive_project("Pomogo-Rust").unwrap();
         let p_archived = store.get_project_by_name("Pomogo-Rust").unwrap().unwrap();
-        assert_eq!(p_archived.archived, true);
+        assert!(p_archived.archived);
     }
 
     #[test]
@@ -633,7 +633,7 @@ mod tests {
 
         let last = store.get_last_block().unwrap().expect("last block exists");
         assert_eq!(last.id, block.id);
-        assert_eq!(last.completed, true);
+        assert!(last.completed);
         assert_eq!(last.pauses, 1);
     }
 }

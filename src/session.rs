@@ -196,7 +196,7 @@ impl Block {
         }
         let mut rem = seg_remaining;
         for i in (self.index + 1)..self.segments.len() {
-            rem = rem + self.segments[i].duration;
+            rem += self.segments[i].duration;
         }
         rem
     }
@@ -216,7 +216,7 @@ impl Block {
             SegmentKind::Work => {
                 self.session_count += 1;
                 let is_long = self.sessions_before_long_break > 0
-                    && self.session_count % self.sessions_before_long_break == 0;
+                    && self.session_count.is_multiple_of(self.sessions_before_long_break);
                 let kind = if is_long {
                     SegmentKind::LongBreak
                 } else {

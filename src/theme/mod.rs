@@ -463,7 +463,7 @@ pub fn resolve_theme_name(configured: &str) -> String {
             return "tokyo-night".to_string();
         }
         let now_seed = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0) + std::process::id() as i64;
-        let idx = (now_seed.abs() as usize) % all.len();
+        let idx = (now_seed.unsigned_abs() as usize) % all.len();
         return all[idx].clone();
     }
 
@@ -477,7 +477,7 @@ pub fn resolve_theme_name(configured: &str) -> String {
         if all.is_empty() {
             return "tokyo-night".to_string();
         }
-        let idx = (hash.abs() as usize) % all.len();
+        let idx = (hash.unsigned_abs() as usize) % all.len();
         return all[idx].clone();
     }
 

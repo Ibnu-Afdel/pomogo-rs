@@ -11,13 +11,7 @@ pub fn tinybar(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let muted = th.muted();
     let txt = th.text();
 
-    let mut width = if f.width > 4 { f.width - 4 } else { 36 };
-    if width > 90 {
-        width = 90;
-    }
-    if width < 36 {
-        width = 36;
-    }
+    let width = (if f.width > 4 { f.width - 4 } else { 36 }).clamp(36, 90);
 
     let clock_str = format_clock(ds);
     let left = ansi_bold_fg(color, &clock_str);

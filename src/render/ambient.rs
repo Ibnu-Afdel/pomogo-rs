@@ -44,8 +44,8 @@ pub fn render_ambient(
 
     let mut bg_grid = vec![vec![" ".to_string(); width]; height];
 
-    for y in 0..height {
-        for x in 0..width {
+    for (y, row) in bg_grid.iter_mut().enumerate() {
+        for (x, cell) in row.iter_mut().enumerate() {
             let mut char_str = " ".to_string();
             match effect {
                 "stars" => {
@@ -62,8 +62,8 @@ pub fn render_ambient(
                 "snow" => {
                     let offset = hash(x as i32, 0, 77);
                     let row = (offset + tick_count as u32) % (height as u32);
-                    if y as u32 == row && hash(x as i32, 0, 88) % 4 == 0 {
-                        char_str = if hash(x as i32, y as i32, 99) % 2 == 0 {
+                    if y as u32 == row && hash(x as i32, 0, 88).is_multiple_of(4) {
+                        char_str = if hash(x as i32, y as i32, 99).is_multiple_of(2) {
                             snow2.clone()
                         } else {
                             snow1.clone()
@@ -73,8 +73,8 @@ pub fn render_ambient(
                 "rain" => {
                     let offset = hash(x as i32, 0, 11);
                     let row = (offset + (tick_count * 2) as u32) % (height as u32);
-                    if y as u32 == row && hash(x as i32, 0, 22) % 3 == 0 {
-                        char_str = if hash(x as i32, y as i32, 33) % 2 == 0 {
+                    if y as u32 == row && hash(x as i32, 0, 22).is_multiple_of(3) {
+                        char_str = if hash(x as i32, y as i32, 33).is_multiple_of(2) {
                             rain2.clone()
                         } else {
                             rain1.clone()
@@ -86,7 +86,7 @@ pub fn render_ambient(
                     let h_safe = height.max(1) as u32;
                     let row = (h_safe + offset - (tick_count as u32 % h_safe)) % h_safe;
                     if y as u32 == row && hash(x as i32, y as i32, 131) % 100 < 7 {
-                        char_str = if hash(x as i32, y as i32, 141) % 2 == 0 {
+                        char_str = if hash(x as i32, y as i32, 141).is_multiple_of(2) {
                             ember1.clone()
                         } else {
                             ember2.clone()
@@ -96,15 +96,14 @@ pub fn render_ambient(
                 "scanline" => {
                     let h_safe = height.max(1);
                     let row = tick_count % h_safe;
-                    if y == row || y == (row + height / 2) % h_safe {
-                        if hash(x as i32, y as i32, 151) % 100 < 65 {
+                    if (y == row || y == (row + height / 2) % h_safe)
+                        && hash(x as i32, y as i32, 151) % 100 < 65 {
                             char_str = scan.clone();
                         }
-                    }
                 }
                 _ => {}
             }
-            bg_grid[y][x] = char_str;
+            *cell = char_str;
         }
     }
 
@@ -122,19 +121,19 @@ pub fn render_ambient(
     let start_x = if width > content_w { (width - content_w) / 2 } else { 0 };
 
     let mut merged = Vec::with_capacity(height);
-    for y in 0..height {
+    for (y, bg_row) in bg_grid.iter().enumerate() {
         if y >= start_y && y < start_y + content_h {
             let line_idx = y - start_y;
             let line = content_lines[line_idx];
 
-            let left_bg = bg_grid[y][..start_x].concat();
-            let overlay = overlay_line(&bg_grid[y][start_x..start_x + content_w.min(width - start_x)], line);
+            let left_bg = bg_row[..start_x].concat();
+            let overlay = overlay_line(&bg_row[start_x..start_x + content_w.min(width - start_x)], line);
             let right_start = (start_x + content_w).min(width);
-            let right_bg = bg_grid[y][right_start..].concat();
+            let right_bg = bg_row[right_start..].concat();
 
             merged.push(format!("{}{}{}", left_bg, overlay, right_bg));
         } else {
-            merged.push(bg_grid[y].concat());
+            merged.push(bg_row.concat());
         }
     }
 

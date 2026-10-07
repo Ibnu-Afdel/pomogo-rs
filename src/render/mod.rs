@@ -77,11 +77,10 @@ pub fn resolve_layout(name: &str, width: usize, height: usize) -> (&'static str,
 
     // Check if requested layout exists and fits
     for (l_name, spec) in &specs {
-        if *l_name == name {
-            if width >= spec.min_width && height >= spec.min_height {
+        if *l_name == name
+            && width >= spec.min_width && height >= spec.min_height {
                 return (*l_name, spec.layout);
             }
-        }
     }
 
     // Preference fallback order for smaller terminals
@@ -110,7 +109,7 @@ pub fn resolve_layout_name(configured: &str) -> String {
 
     if configured == "random" {
         let now_seed = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0) + std::process::id() as i64;
-        let idx = (now_seed.abs() as usize) % layouts.len();
+        let idx = (now_seed.unsigned_abs() as usize) % layouts.len();
         return layouts[idx].to_string();
     }
 
@@ -120,7 +119,7 @@ pub fn resolve_layout_name(configured: &str) -> String {
         for b in date_str.bytes() {
             hash = hash.wrapping_mul(31).wrapping_add(b as i64);
         }
-        let idx = (hash.abs() as usize) % layouts.len();
+        let idx = (hash.unsigned_abs() as usize) % layouts.len();
         return layouts[idx].to_string();
     }
 
@@ -135,7 +134,7 @@ pub fn resolve_effects_name(configured: &str) -> String {
     if configured == "random" {
         let effects = ["stars", "snow", "rain", "embers", "scanline"];
         let now_seed = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0) + std::process::id() as i64;
-        let idx = (now_seed.abs() as usize) % effects.len();
+        let idx = (now_seed.unsigned_abs() as usize) % effects.len();
         return effects[idx].to_string();
     }
     configured.to_string()
@@ -168,8 +167,10 @@ mod tests {
 
     #[test]
     fn test_format_clock() {
-        let mut ds = DisplayState::default();
-        ds.segment_remaining = Duration::minutes(25);
+        let mut ds = DisplayState {
+            segment_remaining: Duration::minutes(25),
+            ..Default::default()
+        };
         assert_eq!(format_clock(&ds), "25:00");
 
         ds.block_remaining = Duration::hours(1) + Duration::minutes(15) + Duration::seconds(4);
@@ -194,16 +195,18 @@ mod tests {
             height: 30,
         };
 
-        let mut ds = DisplayState::default();
-        ds.mode_label = "Quick Focus".to_string();
-        ds.project = "Pomogo-Rust".to_string();
-        ds.task = "Testing Layouts".to_string();
-        ds.phase_kind = SessionPhase::Work;
-        ds.segment_remaining = Duration::minutes(24) + Duration::seconds(30);
-        ds.progress = 0.5;
-        ds.running = true;
-        ds.hints_visibility = true;
-        ds.theme_name = "tokyo-night".to_string();
+        let mut ds = DisplayState {
+            mode_label: "Quick Focus".to_string(),
+            project: "Pomogo-Rust".to_string(),
+            task: "Testing Layouts".to_string(),
+            phase_kind: SessionPhase::Work,
+            segment_remaining: Duration::minutes(24) + Duration::seconds(30),
+            progress: 0.5,
+            running: true,
+            hints_visibility: true,
+            theme_name: "tokyo-night".to_string(),
+            ..Default::default()
+        };
         ds.git_branch = "main".to_string();
 
         let specs = get_layout_specs();

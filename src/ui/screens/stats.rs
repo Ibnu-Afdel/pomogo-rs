@@ -23,13 +23,7 @@ pub fn render_stats(
     let prog_track = th.progress_track();
     let txt_col = th.text();
 
-    let mut text_w = if width > 12 { width - 12 } else { 34 };
-    if text_w > 68 {
-        text_w = 68;
-    }
-    if text_w < 34 {
-        text_w = 34;
-    }
+    let text_w = (if width > 12 { width - 12 } else { 34 }).clamp(34, 68);
 
     let today_str = format!("Today: {} sessions ({} mins focused)", s.today_count, s.today_minutes);
     let streak_str = format!("Streak: {} days (Best: {} days)", s.current_streak, s.best_streak);
@@ -84,16 +78,17 @@ pub fn render_stats(
         ansi_fg(muted_col, "Tab timer  ·  y yank stats  ·  ? help  ·  q quit")
     };
 
-    let mut lines = Vec::new();
-    lines.push(String::new());
-    lines.push(center_text(&ansi_bold_fg(accent_col, "Focus Statistics"), text_w));
-    lines.push(String::new());
-    lines.push(center_text(&today_str, text_w));
-    lines.push(center_text(&streak_str, text_w));
-    lines.push(center_text(&month_str, text_w));
-    lines.push(center_text(&life_str, text_w));
-    lines.push(String::new());
-    lines.push(center_text(&graph_title, text_w));
+    let mut lines = vec![
+        String::new(),
+        center_text(&ansi_bold_fg(accent_col, "Focus Statistics"), text_w),
+        String::new(),
+        center_text(&today_str, text_w),
+        center_text(&streak_str, text_w),
+        center_text(&month_str, text_w),
+        center_text(&life_str, text_w),
+        String::new(),
+        center_text(&graph_title, text_w),
+    ];
 
     for g_line in graph {
         lines.push(center_text(&g_line, text_w));

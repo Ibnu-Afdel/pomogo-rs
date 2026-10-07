@@ -11,13 +11,7 @@ pub fn monolith(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let muted = th.muted();
     let txt = th.text();
 
-    let mut width = if f.width > 8 { f.width - 8 } else { 44 };
-    if width > 78 {
-        width = 78;
-    }
-    if width < 44 {
-        width = 44;
-    }
+    let width = (if f.width > 8 { f.width - 8 } else { 44 }).clamp(44, 78);
 
     let mut lines = Vec::new();
     if !ds.zen {

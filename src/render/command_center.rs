@@ -13,22 +13,14 @@ pub fn command_center(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
     let txt = th.text();
     let border = th.border();
 
-    let mut width = if f.width > 8 { f.width - 8 } else { 62 };
-    if width > 92 {
-        width = 92;
-    }
-    if width < 62 {
-        width = 62;
-    }
+    let width = (if f.width > 8 { f.width - 8 } else { 62 }).clamp(62, 92);
 
     let left_w = width / 2;
     let right_w = width - left_w - 3;
 
-    let timer_block = vec![
-        ansi_fg(muted, &ds.mode_label.to_uppercase()),
+    let timer_block = [ansi_fg(muted, &ds.mode_label.to_uppercase()),
         ansi_bold_fg(color, &format_clock(ds)),
-        progress_bar(ds.progress, left_w, th.progress_fill(), th.progress_track()),
-    ];
+        progress_bar(ds.progress, left_w, th.progress_fill(), th.progress_track())];
 
     let project = if ds.project.is_empty() {
         "No project".to_string()
@@ -46,15 +38,13 @@ pub fn command_center(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
         ds.status_message.clone()
     };
 
-    let right_lines = vec![
-        ansi_fg(muted, "PROJECT"),
+    let right_lines = [ansi_fg(muted, "PROJECT"),
         ansi_bold_fg(txt, &truncate_text(&project, right_w, "…")),
         String::new(),
         ansi_fg(muted, "TASK"),
         ansi_fg(txt, &truncate_text(&task, right_w, "…")),
         String::new(),
-        ansi_fg(muted, &truncate_text(&status, right_w, "…")),
-    ];
+        ansi_fg(muted, &truncate_text(&status, right_w, "…"))];
 
     let max_lines = timer_block.len().max(right_lines.len());
     let mut combined = Vec::new();
@@ -64,10 +54,10 @@ pub fn command_center(ds: &DisplayState, th: &Theme, f: &Frame) -> String {
         let right_part = if i < right_lines.len() { &right_lines[i] } else { "" };
 
         let vis_l = visible_width(left_part);
-        let pad_l = if left_w >= vis_l { left_w - vis_l } else { 0 };
+        let pad_l = left_w.saturating_sub(vis_l);
 
         let vis_r = visible_width(right_part);
-        let pad_r = if right_w >= vis_r { right_w - vis_r } else { 0 };
+        let pad_r = right_w.saturating_sub(vis_r);
 
         let row = format!(
             "{}{}{}{}{}{}",
