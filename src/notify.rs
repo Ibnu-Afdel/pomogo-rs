@@ -15,6 +15,25 @@ pub struct SoundProfile {
     pub end_event: &'static str,
 }
 
+/// Plays a freedesktop sound event: canberra first (honours the sound theme),
+/// then the raw theme file through PipeWire or PulseAudio.
+fn play_sound_event(event: &str) -> bool {
+    let ok = |cmd: &mut Command| cmd.output().map(|o| o.status.success()).unwrap_or(false);
+
+    if ok(Command::new("canberra-gtk-play").args(["-i", event])) {
+        return true;
+    }
+
+    let file = ["oga", "ogg", "wav"]
+        .iter()
+        .map(|ext| format!("/usr/share/sounds/freedesktop/stereo/{}.{}", event, ext))
+        .find(|p| std::path::Path::new(p).exists());
+    match file {
+        Some(f) => ok(Command::new("pw-play").arg(&f)) || ok(Command::new("paplay").arg(&f)),
+        None => false,
+    }
+}
+
 pub fn sound_profiles() -> Vec<SoundProfile> {
     vec![
         SoundProfile {
@@ -97,14 +116,7 @@ impl Notifier {
     fn play_event(&self, event_id: &str) {
         let event = event_id.to_string();
         std::thread::spawn(move || {
-            // Attempt canberra-gtk-play
-            let res = Command::new("canberra-gtk-play")
-                .arg("-i")
-                .arg(&event)
-                .output();
-
-            if res.is_err() {
-                // Fallback to terminal bell
+            if !play_sound_event(&event) {
                 print!("\x07");
             }
         });
