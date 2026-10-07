@@ -236,6 +236,13 @@ enum OmarchyAction {
 }
 
 fn main() {
+    // Exit quietly when piped into `head` and friends instead of panicking
+    // on a closed stdout.
+    // SAFETY: resetting a signal disposition before any threads exist.
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+
     let cli = Cli::parse();
 
     match cli.command {
