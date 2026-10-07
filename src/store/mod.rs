@@ -8,6 +8,33 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 pub use models::{BlockStore, DbSession, Project};
 
+/// Parses a stored timestamp. Rows written by this version are RFC 3339;
+/// the Go release stored `time.Time.String()`, e.g.
+/// `2026-07-14 10:21:57.208608329 +0300 EAT m=+128.698439020`, and
+/// go-sqlite3 style `2026-07-14 10:21:57.2086+03:00` also turns up.
+pub fn parse_db_time(raw: &str) -> Option<DateTime<Utc>> {
+    let s = raw.trim();
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.with_timezone(&Utc));
+    }
+
+    // Go's String(): "<date> <time> <offset> <zone abbr> [m=±monotonic]".
+    let mut parts = s.split_whitespace();
+    if let (Some(date), Some(time), Some(offset)) = (parts.next(), parts.next(), parts.next()) {
+        let candidate = format!("{} {} {}", date, time, offset);
+        if let Ok(dt) = DateTime::parse_from_str(&candidate, "%Y-%m-%d %H:%M:%S%.f %z") {
+            return Some(dt.with_timezone(&Utc));
+        }
+    }
+
+    for fmt in ["%Y-%m-%d %H:%M:%S%.f%:z", "%Y-%m-%dT%H:%M:%S%.f%:z"] {
+        if let Ok(dt) = DateTime::parse_from_str(s, fmt) {
+            return Some(dt.with_timezone(&Utc));
+        }
+    }
+    None
+}
+
 pub struct Store {
     conn: Connection,
 }
@@ -156,37 +183,31 @@ impl Store {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<DbSession>, String> {
-        let start_str = start.to_rfc3339();
-        let end_str = end.to_rfc3339();
-
+        // Timestamps are stored as text in more than one format (the Go
+        // release wrote time.Time.String()), so string comparison in SQL
+        // cannot select a time range. Parse every row and filter here.
         let mut stmt = self
             .conn
             .prepare(
                 "SELECT s.id, s.type, s.task, s.note, s.started_at, s.ended_at, s.completed, s.duration_secs, s.project_id, p.name, s.mode, s.block_id
                  FROM sessions s
-                 LEFT JOIN projects p ON s.project_id = p.id
-                 WHERE s.started_at >= ? AND s.started_at <= ?
-                 ORDER BY s.started_at ASC",
+                 LEFT JOIN projects p ON s.project_id = p.id",
             )
             .map_err(|e| e.to_string())?;
 
         let rows = stmt
-            .query_map(params![start_str, end_str], |row| {
+            .query_map([], |row| {
                 let started_str: String = row.get(4)?;
-                let started_at = DateTime::parse_from_rfc3339(&started_str)
-                    .map(|d| d.with_timezone(&Utc))
-                    .unwrap_or_else(|_| Utc::now());
+                let Some(started_at) = parse_db_time(&started_str) else {
+                    return Ok(None);
+                };
 
                 let ended_str: Option<String> = row.get(5)?;
-                let ended_at = ended_str.and_then(|s| {
-                    DateTime::parse_from_rfc3339(&s)
-                        .map(|d| d.with_timezone(&Utc))
-                        .ok()
-                });
+                let ended_at = ended_str.as_deref().and_then(parse_db_time);
 
                 let completed_int: i32 = row.get(6)?;
 
-                Ok(DbSession {
+                Ok(Some(DbSession {
                     id: row.get(0)?,
                     session_type: row.get(1)?,
                     task: row.get(2)?,
@@ -199,14 +220,19 @@ impl Store {
                     project_name: row.get(9)?,
                     mode: row.get(10)?,
                     block_id: row.get(11)?,
-                })
+                }))
             })
             .map_err(|e| e.to_string())?;
 
         let mut sessions = Vec::new();
         for r in rows {
-            sessions.push(r.map_err(|e| e.to_string())?);
+            if let Some(sess) = r.map_err(|e| e.to_string())? {
+                if sess.started_at >= start && sess.started_at <= end {
+                    sessions.push(sess);
+                }
+            }
         }
+        sessions.sort_by_key(|s| (s.started_at, s.id));
         Ok(sessions)
     }
 
@@ -383,16 +409,10 @@ impl Store {
         let res = stmt
             .query_row([], |row| {
                 let started_str: String = row.get(3)?;
-                let started_at = DateTime::parse_from_rfc3339(&started_str)
-                    .map(|d| d.with_timezone(&Utc))
-                    .unwrap_or_else(|_| Utc::now());
+                let started_at = parse_db_time(&started_str).unwrap_or(DateTime::UNIX_EPOCH);
 
                 let ended_str: Option<String> = row.get(4)?;
-                let ended_at = ended_str.and_then(|s| {
-                    DateTime::parse_from_rfc3339(&s)
-                        .map(|d| d.with_timezone(&Utc))
-                        .ok()
-                });
+                let ended_at = ended_str.as_deref().and_then(parse_db_time);
 
                 let completed_int: i32 = row.get(5)?;
 
@@ -440,6 +460,44 @@ impl Store {
 mod tests {
     use super::*;
     use chrono::Duration;
+
+    #[test]
+    fn test_parse_db_time_formats() {
+        let expected = DateTime::parse_from_rfc3339("2026-07-14T07:21:57.208608329Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        assert_eq!(parse_db_time("2026-07-14T10:21:57.208608329+03:00"), Some(expected));
+        assert_eq!(
+            parse_db_time("2026-07-14 10:21:57.208608329 +0300 EAT m=+128.698439020"),
+            Some(expected)
+        );
+        assert_eq!(parse_db_time("2026-07-14 10:21:57.208608329 +0300 EAT"), Some(expected));
+        assert_eq!(parse_db_time("2026-07-14 10:21:57.208608329+03:00"), Some(expected));
+        assert_eq!(parse_db_time("not a time"), None);
+    }
+
+    #[test]
+    fn test_get_sessions_reads_go_timestamps() {
+        let store = Store::in_memory().unwrap();
+        store
+            .conn
+            .execute(
+                "INSERT INTO sessions (type, started_at, ended_at, completed, duration_secs)
+                 VALUES ('work', '2026-07-14 10:21:57.2 +0300 EAT m=+1.5', '2026-07-14 10:46:57.2 +0300 EAT m=+1501.5', 1, 1500),
+                        ('work', '2026-07-15T09:00:00+00:00', NULL, 1, 1500)",
+                [],
+            )
+            .unwrap();
+
+        let day = |d: &str| DateTime::parse_from_rfc3339(d).unwrap().with_timezone(&Utc);
+        let all = store.get_sessions(day("2026-07-01T00:00:00Z"), day("2026-08-01T00:00:00Z")).unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].started_at, day("2026-07-14T07:21:57.2Z"));
+        assert_eq!(all[0].ended_at, Some(day("2026-07-14T07:46:57.2Z")));
+
+        let only_15th = store.get_sessions(day("2026-07-15T00:00:00Z"), day("2026-07-16T00:00:00Z")).unwrap();
+        assert_eq!(only_15th.len(), 1);
+    }
 
     #[test]
     fn test_store_in_memory_migrations() {
