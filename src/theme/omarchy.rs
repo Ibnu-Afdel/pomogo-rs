@@ -1,8 +1,13 @@
 // First-party Omarchy Linux integration for dynamic system-wide theming.
-// Reads live color palette from Omarchy: ~/.local/state/omarchy/current/theme/colors.toml
+// Reads the live palette from ~/.local/state/omarchy/current/theme/colors.toml.
+//
+// Omarchy 4 themes name their colors (red, blue, muted, ...); older themes
+// only carry the terminal palette (color0..color15). Both are understood,
+// with the named keys taking precedence.
 
 use std::fs;
 use std::path::PathBuf;
+use std::time::SystemTime;
 use serde::Deserialize;
 
 use crate::theme::Theme;
@@ -13,9 +18,18 @@ pub struct OmarchyColors {
     pub foreground: Option<String>,
     pub accent: Option<String>,
     pub selection: Option<String>,
+    pub muted: Option<String>,
     pub dark_background: Option<String>,
     pub darker_background: Option<String>,
+    pub lighter_background: Option<String>,
     pub bright_foreground: Option<String>,
+
+    pub red: Option<String>,
+    pub green: Option<String>,
+    pub yellow: Option<String>,
+    pub blue: Option<String>,
+    pub magenta: Option<String>,
+    pub cyan: Option<String>,
 
     pub color0: Option<String>,
     pub color1: Option<String>,
@@ -76,41 +90,52 @@ pub fn omarchy_colors_file_path() -> Option<PathBuf> {
     None
 }
 
+fn pick(candidates: &[&Option<String>], fallback: &str) -> String {
+    candidates
+        .iter()
+        .find_map(|c| c.as_ref().filter(|v| !v.trim().is_empty()).cloned())
+        .unwrap_or_else(|| fallback.to_string())
+}
+
 pub fn parse_omarchy_colors(content: &str) -> Option<Theme> {
-    let colors: OmarchyColors = toml::from_str(content).ok()?;
+    let c: OmarchyColors = toml::from_str(content).ok()?;
 
-    let bg = colors.background.unwrap_or_else(|| "#1a1b26".to_string());
-    let fg = colors.foreground.unwrap_or_else(|| "#c0caf5".to_string());
-    let accent = colors.accent.clone().or(colors.color5.clone()).unwrap_or_else(|| "#bb9af7".to_string());
-    let selection = colors.selection.unwrap_or_else(|| "#283457".to_string());
+    let bg = pick(&[&c.background], "#1a1b26");
+    let fg = pick(&[&c.foreground], "#c0caf5");
+    let accent = pick(&[&c.accent, &c.blue, &c.color4], "#7aa2f7");
+    let selection = pick(&[&c.selection, &c.lighter_background, &c.color0], "#283457");
 
-    // ANSI colors mapping
-    let work = colors.color1.unwrap_or_else(|| "#f7768e".to_string());
-    let brk = colors.color4.unwrap_or_else(|| "#7aa2f7".to_string());
-    let long_brk = colors.color2.unwrap_or_else(|| "#9ece6a".to_string());
-    let idle = colors.color8.clone().unwrap_or_else(|| "#565f89".to_string());
-    let muted = colors.color8.unwrap_or_else(|| "#565f89".to_string());
-    let subtle = colors.color0.unwrap_or_else(|| selection.clone());
-    let border = accent.clone();
-    let ambient = colors.dark_background.unwrap_or_else(|| selection.clone());
+    let work = pick(&[&c.red, &c.color1], "#f7768e");
+    let brk = pick(&[&c.blue, &c.color4], "#7aa2f7");
+    let long_brk = pick(&[&c.green, &c.color2], "#9ece6a");
+    let muted = pick(&[&c.muted, &c.color8], "#565f89");
+    let subtle = pick(&[&c.lighter_background, &c.selection, &c.color0], &selection);
+    let ambient = pick(&[&c.dark_background, &c.selection, &c.color0], &selection);
 
     Some(Theme {
         name: "omarchy".to_string(),
         work,
         brk,
         long_break: long_brk,
-        idle,
+        idle: muted.clone(),
         accent: accent.clone(),
         background: bg,
         text: fg,
         muted,
         subtle,
-        border,
+        border: accent.clone(),
         progress_fill: accent,
         progress_track: selection,
         ambient,
-        description: "Dynamic system theme loaded from Omarchy Linux".to_string(),
+        description: "Follows the active Omarchy theme".to_string(),
     })
+}
+
+/// Modification time of the active Omarchy palette, used to notice
+/// `omarchy theme set` while the TUI is running.
+pub fn omarchy_colors_mtime() -> Option<SystemTime> {
+    let path = omarchy_colors_file_path()?;
+    fs::metadata(path).and_then(|m| m.modified()).ok()
 }
 
 pub fn load_omarchy_theme() -> Option<Theme> {
@@ -144,6 +169,31 @@ color8 = "#585b70"
         assert_eq!(theme.brk, "#89b4fa");
         assert_eq!(theme.long_break, "#a6e3a1");
         assert_eq!(theme.muted, "#585b70");
+    }
+
+    #[test]
+    fn test_parse_omarchy4_named_colors() {
+        let sample = r##"
+mode = "dark"
+accent = "#509475"
+selection = "#32473B"
+muted = "#53685B"
+background = "#111c18"
+dark_background = "#0c1512"
+lighter_background = "#23372B"
+foreground = "#C1C497"
+red = "#FF5345"
+green = "#549e6a"
+blue = "#509475"
+"##;
+        let theme = parse_omarchy_colors(sample).expect("parse omarchy 4 colors");
+        assert_eq!(theme.work, "#FF5345");
+        assert_eq!(theme.brk, "#509475");
+        assert_eq!(theme.long_break, "#549e6a");
+        assert_eq!(theme.muted, "#53685B");
+        assert_eq!(theme.accent, "#509475");
+        assert_eq!(theme.progress_track, "#32473B");
+        assert_eq!(theme.ambient, "#0c1512");
     }
 }
 
