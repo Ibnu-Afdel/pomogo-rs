@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "pomogo.timer",
+  "name": "PomoGo",
+  "version": "2.0.0",
+  "author": "Ibnu Afdel",
+  "description": "Live PomoGo focus timer for the Omarchy bar",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "PomoGo",
+    "description": "Countdown of the running PomoGo session. Click to open, right click to pause or resume, middle click to skip.",
+    "category": "Time",
+    "allowMultiple": false,
+    "defaultSection": "center",
+    "defaults": {
+      "showTask": "Off",
+      "whenIdle": "Hide"
+    },
+    "schema": [
+      {
+        "key": "showTask",
+        "type": "enum",
+        "label": "Show task name",
+        "options": ["Off", "On"],
+        "defaultValue": "Off"
+      },
+      {
+        "key": "whenIdle",
+        "type": "enum",
+        "label": "While PomoGo is open but not started",
+        "options": ["Hide", "Show"],
+        "defaultValue": "Hide"
+      }
+    ]
+  }
+}
