@@ -341,6 +341,9 @@ impl App {
                 if self.runner.timer.is_running && !self.runner.timer.is_paused {
                     let prev_phase = self.runner.timer.phase;
                     let started_at = self.runner.timer.started_at.unwrap_or_else(Utc::now);
+                    // Read before tick(): once the segment ends, the block has
+                    // already moved on to the next segment's duration.
+                    let dur = self.runner.block.current_segment.duration;
 
                     if prev_phase == SessionPhase::Work {
                         for due in self.wellness.focus_elapsed(Duration::seconds(1)) {
@@ -350,7 +353,6 @@ impl App {
                     }
 
                     if let Some(evt) = self.runner.tick(&clock) {
-                        let dur = self.runner.block.current_segment.duration;
                         self.record_session(prev_phase, started_at, Utc::now(), true, dur);
                         self.refresh_today();
                         if evt.phase != SessionPhase::Work && evt.state != SessionState::Idle {
