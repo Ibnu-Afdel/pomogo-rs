@@ -20,6 +20,10 @@ PomoGo becomes a focus companion: set it up once, then it runs your day.
 - **Help overlay** grouped into Session, Companion, Look and General.
 - The Omarchy widget swaps its icon during a reminder and shows today's
   progress in its tooltip.
+- `pomogo screenshot-preview --scene ready|focus|reminder|break|deep` and
+  `pomogo themes --json`, used to render the website from the real binary.
+- The bar widget's repository now has a preview image and install, update
+  and removal instructions for the Omarchy plugin marketplace.
 - Fixed: finished segments were stored with the next segment's duration, so
   focus time was undercounted.
 
