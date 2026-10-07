@@ -7,7 +7,9 @@ use clap_complete::{generate, Shell};
 
 use pomogo_rust::config::{db_file_path, Config};
 use pomogo_rust::integrations::{format_status, run_doctor};
-use pomogo_rust::omarchy::{install_desktop_entry, install_quickshell_plugin, print_omarchy_status};
+use pomogo_rust::omarchy::{
+    install_desktop_entry, install_plugin, print_omarchy_status, uninstall_plugin, HYPRLAND_SNIPPET,
+};
 use pomogo_rust::render::ambient::render_ambient;
 use pomogo_rust::render::bigclock::ansi_fg;
 use pomogo_rust::render::{
@@ -217,11 +219,19 @@ enum ProjectAction {
 
 #[derive(Subcommand)]
 enum OmarchyAction {
-    /// Display Omarchy integration health and palette information
+    /// Show Omarchy detection, theme palette and bar widget state
     Status,
-    /// Install Quickshell top-bar widget into Omarchy plugins
-    InstallQuickshell,
-    /// Install Pomogo desktop launcher entry
+    /// Install the PomoGo bar widget into omarchy-shell and enable it
+    Install {
+        /// Only copy the widget files; leave the bar untouched
+        #[arg(long)]
+        no_enable: bool,
+    },
+    /// Remove the bar widget from the bar and delete its files
+    Uninstall,
+    /// Print suggested Hyprland keybindings for ~/.config/hypr/bindings.lua
+    Keybindings,
+    /// Install the PomoGo desktop launcher entry
     InstallDesktop,
 }
 
@@ -748,13 +758,23 @@ fn handle_omarchy(action: Option<OmarchyAction>) {
         OmarchyAction::Status => {
             print_omarchy_status();
         }
-        OmarchyAction::InstallQuickshell => match install_quickshell_plugin() {
-            Ok(p) => println!("✔ Quickshell plugin installed successfully at: {}", p.display()),
-            Err(e) => {
-                eprintln!("Error installing Quickshell plugin: {}", e);
+        OmarchyAction::Install { no_enable } => {
+            if let Err(e) = install_plugin(!no_enable) {
+                eprintln!("Error installing the bar widget: {}", e);
                 process::exit(1);
             }
-        },
+            println!();
+            println!("Suggested keybindings for ~/.config/hypr/bindings.lua:");
+            println!();
+            print!("{}", HYPRLAND_SNIPPET);
+        }
+        OmarchyAction::Uninstall => {
+            if let Err(e) = uninstall_plugin() {
+                eprintln!("Error removing the bar widget: {}", e);
+                process::exit(1);
+            }
+        }
+        OmarchyAction::Keybindings => print!("{}", HYPRLAND_SNIPPET),
         OmarchyAction::InstallDesktop => match install_desktop_entry() {
             Ok(p) => println!("✔ Desktop launcher installed at: {}", p.display()),
             Err(e) => {
