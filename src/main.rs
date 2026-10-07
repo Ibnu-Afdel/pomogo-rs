@@ -26,6 +26,38 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Parser)]
 #[command(name = "pomogo", version = VERSION, about = "Sleek, distraction-free Pomodoro timer TUI for Linux, Omarchy, and developers")]
 struct Cli {
+    /// Active color theme (e.g. tokyo-night, omarchy, nord, gruvbox)
+    #[arg(long)]
+    theme: Option<String>,
+
+    /// Terminal UI layout (e.g. classic, minimal, centered, compact, retro, dashboard, monolith, tinybar, terminal-rice, focus-stack, command-center)
+    #[arg(long)]
+    layout: Option<String>,
+
+    /// Ambient particle background effect (e.g. stars, snow, rain, embers, scanline, none)
+    #[arg(long)]
+    effects: Option<String>,
+
+    /// Active task description
+    #[arg(long)]
+    task: Option<String>,
+
+    /// Target project name
+    #[arg(long)]
+    project: Option<String>,
+
+    /// Custom work duration in minutes
+    #[arg(long)]
+    work: Option<usize>,
+
+    /// Custom break duration in minutes
+    #[arg(long)]
+    break_time: Option<usize>,
+
+    /// Start in Zen mode (hide hints/chrome)
+    #[arg(long)]
+    zen: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -88,7 +120,39 @@ enum Commands {
     /// Start timer with a specific profile or project
     Start {
         /// Target profile or project name
-        target: String,
+        target: Option<String>,
+
+        /// Active color theme
+        #[arg(long)]
+        theme: Option<String>,
+
+        /// Terminal UI layout
+        #[arg(long)]
+        layout: Option<String>,
+
+        /// Ambient particle background effect
+        #[arg(long)]
+        effects: Option<String>,
+
+        /// Active task description
+        #[arg(long)]
+        task: Option<String>,
+
+        /// Target project name
+        #[arg(long)]
+        project: Option<String>,
+
+        /// Custom work duration in minutes
+        #[arg(long)]
+        work: Option<usize>,
+
+        /// Custom break duration in minutes
+        #[arg(long)]
+        break_time: Option<usize>,
+
+        /// Start in Zen mode
+        #[arg(long)]
+        zen: bool,
     },
     /// Check system dependencies and configuration health
     Doctor,
@@ -157,7 +221,17 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        None => handle_default(),
+        None => run_app(
+            None,
+            cli.theme,
+            cli.layout,
+            cli.effects,
+            cli.task,
+            cli.project,
+            cli.work,
+            cli.break_time,
+            cli.zen,
+        ),
         Some(Commands::Version) => handle_version(),
         Some(Commands::Config { action }) => handle_config(action),
         Some(Commands::Stats { week, month }) => handle_stats(week, month),
@@ -170,20 +244,31 @@ fn main() {
         Some(Commands::Status { format }) => handle_status(&format),
         Some(Commands::Completion { shell }) => handle_completion(&shell),
         Some(Commands::Projects { action }) => handle_projects(action),
-        Some(Commands::Start { target }) => handle_start(&target),
+        Some(Commands::Start {
+            target,
+            theme,
+            layout,
+            effects,
+            task,
+            project,
+            work,
+            break_time,
+            zen,
+        }) => run_app(
+            target.as_deref(),
+            theme.or(cli.theme),
+            layout.or(cli.layout),
+            effects.or(cli.effects),
+            task.or(cli.task),
+            project.or(cli.project),
+            work.or(cli.work),
+            break_time.or(cli.break_time),
+            zen || cli.zen,
+        ),
         Some(Commands::Doctor) => handle_doctor(),
         Some(Commands::Export { format, start, end }) => handle_export(&format, start, end),
         Some(Commands::Report { start, end }) => handle_report(start, end),
         Some(Commands::Omarchy { action }) => handle_omarchy(action),
-    }
-}
-
-fn handle_default() {
-    let cfg = Config::load().unwrap_or_default();
-    let mut app = App::new(cfg);
-    if let Err(e) = app.run() {
-        eprintln!("Error running PomoGo: {}", e);
-        process::exit(1);
     }
 }
 
@@ -504,24 +589,68 @@ fn handle_projects(action: Option<ProjectAction>) {
     }
 }
 
-fn handle_start(target: &str) {
+fn run_app(
+    target: Option<&str>,
+    theme: Option<String>,
+    layout: Option<String>,
+    effects: Option<String>,
+    task: Option<String>,
+    project_flag: Option<String>,
+    work: Option<usize>,
+    break_time: Option<usize>,
+    zen: bool,
+) {
     let mut cfg = Config::load().unwrap_or_default();
-    let (resolved_cfg, mut project, sound_event) = cfg.resolve_profile(target);
-    cfg = resolved_cfg;
+    let mut project = String::new();
+    let mut sound_event = String::new();
 
-    if project.is_empty() {
-        if let Ok(store) = Store::new(&db_file_path()) {
-            if let Ok(Some(p)) = store.get_project_by_name(target) {
-                project = p.name;
+    if let Some(tgt) = target {
+        let (resolved_cfg, mut proj, snd) = cfg.resolve_profile(tgt);
+        cfg = resolved_cfg;
+        sound_event = snd;
+
+        if proj.is_empty() {
+            if let Ok(store) = Store::new(&db_file_path()) {
+                if let Ok(Some(p)) = store.get_project_by_name(tgt) {
+                    proj = p.name;
+                }
             }
         }
+        if proj.is_empty() {
+            proj = tgt.to_string();
+        }
+        project = proj;
     }
-    if project.is_empty() {
-        project = target.to_string();
+
+    if let Some(t) = theme {
+        cfg.theme = t;
+    }
+    if let Some(l) = layout {
+        cfg.layout = l;
+    }
+    if let Some(e) = effects {
+        cfg.effects = e;
+    }
+    if let Some(w) = work {
+        cfg.work_duration = w;
+    }
+    if let Some(b) = break_time {
+        cfg.short_break_duration = b;
+    }
+    if let Some(p) = project_flag {
+        project = p;
     }
 
     let mut app = App::new(cfg);
-    app.set_project_by_name(&project);
+    if !project.is_empty() {
+        app.set_project_by_name(&project);
+    }
+    if let Some(t) = task {
+        app.current_task = t;
+    }
+    if zen {
+        app.zen_mode = true;
+    }
     if !sound_event.is_empty() {
         app.notifier.set_sound_events(sound_event.clone(), sound_event);
     }
