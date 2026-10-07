@@ -11,6 +11,7 @@ use pomogo_rust::omarchy::{
     install_desktop_entry, install_plugin, print_omarchy_status, uninstall_plugin, HYPRLAND_SNIPPET,
 };
 use pomogo_rust::render::ambient::render_ambient;
+use pomogo_rust::setup;
 use pomogo_rust::render::bigclock::ansi_fg;
 use pomogo_rust::render::{
     resolve_effects_name, resolve_layout, resolve_layout_name, DisplayState, Frame,
@@ -132,6 +133,8 @@ enum Commands {
         #[arg(long, default_value = "default")]
         format: String,
     },
+    /// Answer a few questions once and write your config
+    Setup,
     /// Start, pause or resume the running TUI (for bar clicks and keybindings)
     Toggle,
     /// Skip the running TUI to its next segment
@@ -251,6 +254,7 @@ fn main() {
         }
         Some(Commands::Recap) => handle_recap(),
         Some(Commands::Status { format }) => handle_status(&format),
+        Some(Commands::Setup) => handle_setup(),
         Some(Commands::Toggle) => handle_remote(RemoteAction::Toggle),
         Some(Commands::Skip) => handle_remote(RemoteAction::Skip),
         Some(Commands::Completion { shell }) => handle_completion(&shell),
@@ -497,6 +501,18 @@ fn handle_status(format: &str) {
     }
 }
 
+fn handle_setup() {
+    if !setup::interactive() {
+        eprintln!("pomogo setup needs a terminal to ask its questions.");
+        process::exit(1);
+    }
+    if let Err(e) = setup::run(true) {
+        eprintln!("Setup cancelled: {}", e);
+        process::exit(1);
+    }
+    println!("Run `pomogo` to start focusing.");
+}
+
 fn handle_remote(action: RemoteAction) {
     if let Err(e) = signal_running(action) {
         eprintln!("{}", e);
@@ -609,6 +625,13 @@ fn run_app(target: Option<&str>, launch: LaunchArgs) {
         break_time,
         zen,
     } = launch;
+    // The first launch asks the setup questions so later launches just run.
+    if setup::first_run() && setup::interactive() {
+        if let Err(e) = setup::run(false) {
+            eprintln!("Setup skipped ({}). Using defaults; run `pomogo setup` later.", e);
+        }
+    }
+
     let mut cfg = Config::load().unwrap_or_default();
     let mut project = String::new();
     let mut sound_event = String::new();

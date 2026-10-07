@@ -6,6 +6,7 @@ pub mod omarchy;
 pub mod render;
 pub mod restore;
 pub mod session;
+pub mod setup;
 pub mod statefile;
 pub mod stats;
 pub mod store;
