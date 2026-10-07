@@ -266,7 +266,7 @@ fn main() {
 }
 
 fn handle_version() {
-    println!("pomogo-rust {} (Linux & Omarchy Edition)", VERSION);
+    println!("pomogo {}", VERSION);
 }
 
 fn handle_config(action: ConfigAction) {
