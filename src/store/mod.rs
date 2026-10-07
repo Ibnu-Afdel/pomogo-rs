@@ -100,6 +100,11 @@ impl Store {
             "ALTER TABLE sessions ADD COLUMN mode TEXT;",
             "ALTER TABLE sessions ADD COLUMN block_id INTEGER REFERENCES blocks(id);",
             "ALTER TABLE projects ADD COLUMN icon TEXT DEFAULT '';",
+            "CREATE TABLE IF NOT EXISTS wellness_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                logged_at DATETIME NOT NULL
+            );",
         ];
 
         for (i, sql) in migrations.iter().enumerate() {
@@ -136,6 +141,36 @@ impl Store {
         }
 
         Ok(())
+    }
+
+    /// Records a wellness action such as a glass of water.
+    pub fn log_wellness(&self, kind: &str, at: DateTime<Utc>) -> Result<(), String> {
+        self.conn
+            .execute(
+                "INSERT INTO wellness_log (kind, logged_at) VALUES (?, ?)",
+                params![kind, at.to_rfc3339()],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Counts wellness actions of `kind` at or after `since`.
+    pub fn count_wellness_since(&self, kind: &str, since: DateTime<Utc>) -> Result<usize, String> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT logged_at FROM wellness_log WHERE kind = ?")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![kind], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        let mut count = 0;
+        for r in rows {
+            let raw = r.map_err(|e| e.to_string())?;
+            if parse_db_time(&raw).is_some_and(|t| t >= since) {
+                count += 1;
+            }
+        }
+        Ok(count)
     }
 
     pub fn get_current_schema_version(&self) -> Result<i64, String> {
@@ -500,10 +535,22 @@ mod tests {
     }
 
     #[test]
+    fn test_wellness_log_counts_since() {
+        let store = Store::in_memory().unwrap();
+        let now = Utc::now();
+        store.log_wellness("water", now - Duration::days(1)).unwrap();
+        store.log_wellness("water", now).unwrap();
+        store.log_wellness("water", now).unwrap();
+        store.log_wellness("stretch", now).unwrap();
+        assert_eq!(store.count_wellness_since("water", now - Duration::hours(1)).unwrap(), 2);
+        assert_eq!(store.count_wellness_since("stretch", now - Duration::hours(1)).unwrap(), 1);
+    }
+
+    #[test]
     fn test_store_in_memory_migrations() {
         let store = Store::in_memory().expect("in memory store should initialize");
         let version = store.get_current_schema_version().unwrap();
-        assert_eq!(version, 7);
+        assert_eq!(version, 8);
     }
 
     #[test]
