@@ -2,7 +2,7 @@ use std::io;
 use std::process;
 
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 
 use pomogo_rust::config::{db_file_path, Config};
@@ -28,7 +28,17 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Parser)]
 #[command(name = "pomogo", version = VERSION, about = "Sleek, distraction-free Pomodoro timer TUI for Linux, Omarchy, and developers")]
 struct Cli {
-    /// Active color theme (e.g. tokyo-night, omarchy, nord, gruvbox)
+    #[command(flatten)]
+    launch: LaunchArgs,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+/// TUI launch flags, accepted both before a subcommand and by `start`.
+#[derive(Args, Clone, Default)]
+struct LaunchArgs {
+    /// Color theme (auto, omarchy, tokyo-night, nord, gruvbox, ...)
     #[arg(long)]
     theme: Option<String>,
 
@@ -59,9 +69,22 @@ struct Cli {
     /// Start in Zen mode (hide hints/chrome)
     #[arg(long)]
     zen: bool,
+}
 
-    #[command(subcommand)]
-    command: Option<Commands>,
+impl LaunchArgs {
+    /// Flags given to `start` win over the same flags given before it.
+    fn or(self, outer: LaunchArgs) -> LaunchArgs {
+        LaunchArgs {
+            theme: self.theme.or(outer.theme),
+            layout: self.layout.or(outer.layout),
+            effects: self.effects.or(outer.effects),
+            task: self.task.or(outer.task),
+            project: self.project.or(outer.project),
+            work: self.work.or(outer.work),
+            break_time: self.break_time.or(outer.break_time),
+            zen: self.zen || outer.zen,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -128,37 +151,8 @@ enum Commands {
         /// Target profile or project name
         target: Option<String>,
 
-        /// Active color theme
-        #[arg(long)]
-        theme: Option<String>,
-
-        /// Terminal UI layout
-        #[arg(long)]
-        layout: Option<String>,
-
-        /// Ambient particle background effect
-        #[arg(long)]
-        effects: Option<String>,
-
-        /// Active task description
-        #[arg(long)]
-        task: Option<String>,
-
-        /// Target project name
-        #[arg(long)]
-        project: Option<String>,
-
-        /// Custom work duration in minutes
-        #[arg(long)]
-        work: Option<usize>,
-
-        /// Custom break duration in minutes
-        #[arg(long)]
-        break_time: Option<usize>,
-
-        /// Start in Zen mode
-        #[arg(long)]
-        zen: bool,
+        #[command(flatten)]
+        launch: LaunchArgs,
     },
     /// Check system dependencies and configuration health
     Doctor,
@@ -246,17 +240,7 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        None => run_app(
-            None,
-            cli.theme,
-            cli.layout,
-            cli.effects,
-            cli.task,
-            cli.project,
-            cli.work,
-            cli.break_time,
-            cli.zen,
-        ),
+        None => run_app(None, cli.launch),
         Some(Commands::Version) => handle_version(),
         Some(Commands::Config { action }) => handle_config(action),
         Some(Commands::Stats { week, month }) => handle_stats(week, month),
@@ -271,27 +255,9 @@ fn main() {
         Some(Commands::Skip) => handle_remote(RemoteAction::Skip),
         Some(Commands::Completion { shell }) => handle_completion(&shell),
         Some(Commands::Projects { action }) => handle_projects(action),
-        Some(Commands::Start {
-            target,
-            theme,
-            layout,
-            effects,
-            task,
-            project,
-            work,
-            break_time,
-            zen,
-        }) => run_app(
-            target.as_deref(),
-            theme.or(cli.theme),
-            layout.or(cli.layout),
-            effects.or(cli.effects),
-            task.or(cli.task),
-            project.or(cli.project),
-            work.or(cli.work),
-            break_time.or(cli.break_time),
-            zen || cli.zen,
-        ),
+        Some(Commands::Start { target, launch }) => {
+            run_app(target.as_deref(), launch.or(cli.launch))
+        }
         Some(Commands::Doctor) => handle_doctor(),
         Some(Commands::Export { format, start, end }) => handle_export(&format, start, end),
         Some(Commands::Report { start, end }) => handle_report(start, end),
@@ -623,17 +589,17 @@ fn handle_projects(action: Option<ProjectAction>) {
     }
 }
 
-fn run_app(
-    target: Option<&str>,
-    theme: Option<String>,
-    layout: Option<String>,
-    effects: Option<String>,
-    task: Option<String>,
-    project_flag: Option<String>,
-    work: Option<usize>,
-    break_time: Option<usize>,
-    zen: bool,
-) {
+fn run_app(target: Option<&str>, launch: LaunchArgs) {
+    let LaunchArgs {
+        theme,
+        layout,
+        effects,
+        task,
+        project: project_flag,
+        work,
+        break_time,
+        zen,
+    } = launch;
     let mut cfg = Config::load().unwrap_or_default();
     let mut project = String::new();
     let mut sound_event = String::new();
