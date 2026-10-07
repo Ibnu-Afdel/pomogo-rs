@@ -1,46 +1,73 @@
 # PomoGo for the Omarchy bar
 
-An [omarchy-shell](https://omarchy.org/) bar widget for
-[PomoGo](https://github.com/Ibnu-Afdel/pomogo-rs), the terminal Pomodoro and
-deep-focus timer.
+A bar widget for [PomoGo](https://github.com/Ibnu-Afdel/pomogo-rs), the
+terminal focus companion: Pomodoro-style focus and breaks on autopilot,
+reminders to rest your eyes, drink water and stretch, and a daily focus goal.
 
-It shows the running segment's countdown, dims while paused, switches its icon
-when PomoGo asks you to rest your eyes, drink water or stretch, and hides when
-PomoGo is closed. The tooltip shows the task and today's progress toward your
-daily focus goal.
+![PomoGo widget in the Omarchy bar](preview.png)
 
-- click: open or focus PomoGo
-- right click: start, pause or resume
-- middle click: skip to the next segment
+The widget shows the countdown of the running focus or break, dims while
+paused, swaps its icon when PomoGo asks you to rest your eyes, drink water or
+stretch, and hides itself when PomoGo is closed. Its tooltip shows the task
+and today's progress toward your daily goal.
+
+| Action | What it does |
+|---|---|
+| Click | Open or focus PomoGo |
+| Right click | Start, pause or resume |
+| Middle click | Skip to the next focus or break |
+
+## Requirements
+
+- Omarchy 4 (omarchy-shell).
+- The `pomogo` command, version 4.0 or newer, on your `PATH`. See the
+  [PomoGo install instructions](https://github.com/Ibnu-Afdel/pomogo-rs#install).
+
+The widget runs no code of its own besides reading PomoGo's state file and
+calling `pomogo toggle`, `pomogo skip` and `omarchy-launch-or-focus-tui pomogo`
+when you click it.
 
 ## Install
-
-The widget needs the `pomogo` command, 3.0 or newer (`yay -S pomogo`, or see
-the PomoGo README). PomoGo can install the widget itself:
-
-```sh
-pomogo omarchy install
-```
-
-Or add this repository with Omarchy's plugin manager:
 
 ```sh
 omarchy plugin add https://github.com/Ibnu-Afdel/omarchy-pomogo.git --enable
 ```
 
-Move it with `omarchy bar move pomogo.timer --section right`. Its settings
-(show the task name, show it while PomoGo is idle) are in Omarchy's bar
-settings.
+It lands in the center of the bar. Move it with:
+
+```sh
+omarchy bar move pomogo.timer --section right
+```
+
+Its settings (show the task name, show the widget while PomoGo is idle) are in
+Omarchy's bar settings. If you have PomoGo installed, `pomogo omarchy install`
+does the same as the `omarchy plugin add` command above.
+
+## Update
+
+```sh
+omarchy plugin update pomogo.timer
+```
+
+If the bar keeps showing the old version, run `omarchy restart shell`.
+
+## Remove
+
+```sh
+omarchy plugin remove pomogo.timer
+```
+
+This takes the widget out of the bar and deletes its folder. PomoGo itself
+and your session history are untouched.
 
 ## How it works
 
-While the PomoGo TUI is open, it rewrites
-`$XDG_RUNTIME_DIR/pomogo/state.json` every second. The widget reads that file
-and hides itself when the updates stop. Clicks run `pomogo toggle`,
-`pomogo skip` and `omarchy-launch-or-focus-tui pomogo`.
+While PomoGo is open it rewrites `$XDG_RUNTIME_DIR/pomogo/state.json` every
+second. The widget reads that file and hides once the updates stop, so a
+closed or crashed PomoGo never leaves a frozen timer in the bar.
 
 This repository is generated from `contrib/omarchy/plugin` in the PomoGo
-repository. Send changes there.
+repository; please send issues and changes there.
 
 ## License
 
