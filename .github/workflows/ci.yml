@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --locked
+      - name: Test
+        run: cargo test --locked
+      - name: Validate the Omarchy plugin manifest
+        run: |
+          jq -e '.schemaVersion == 1 and .id == "pomogo.timer" and .entryPoints.barWidget == "BarWidget.qml"' \
+            contrib/omarchy/plugin/manifest.json
+          test -f contrib/omarchy/plugin/BarWidget.qml
