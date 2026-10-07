@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=PomoGo
+GenericName=Pomodoro Focus Timer
+Comment=Sleek, distraction-free Pomodoro timer TUI for Linux, Omarchy, and developers
+Exec=pomogo
+Icon=pomogo
+Terminal=true
+Type=Application
+Categories=Utility;Clock;Productivity;
+Keywords=pomodoro;timer;focus;productivity;
+StartupNotify=true
+

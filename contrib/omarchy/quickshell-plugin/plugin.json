@@ -1,0 +1,8 @@
+{
+  "name": "pomogo",
+  "version": "2.0.0",
+  "description": "Native Omarchy status bar widget for PomoGo Pomodoro timer",
+  "author": "Ibnu Afdel",
+  "entrypoint": "PomogoBar.qml"
+}
+
