@@ -1,26 +1,33 @@
 # PomoGo
 
-A calm, keyboard-driven Pomodoro and deep-focus timer for the Linux terminal,
-built for [Omarchy](https://omarchy.org/) first and at home on any other
-distro.
+A calm focus companion for the Linux terminal. Set it up once, press enter,
+and get on with your work: PomoGo runs your focus and break rhythm, reminds
+you to rest your eyes, drink water and stretch, and keeps a record of every
+session.
 
-This is the Rust rewrite of [PomoGo](https://github.com/Ibnu-Afdel/pomogo). It
-reads and continues the Go release's session history, so switching over keeps
-your stats.
+Built for [Omarchy](https://omarchy.org/) first and at home on any other
+distro. Written in Rust; it reads and continues the history of the original
+Go release.
 
 ## Highlights
 
-- **Quick Focus** (classic 25/5 cycles) and **Deep Focus** (1–4 hour blocks
-  with breaks planned behind the scenes).
-- **Omarchy-native**: a bar widget for `omarchy-shell`, colors that follow
-  `omarchy theme set` live, pausing when the screen locks, and launching
-  through Omarchy's TUI launcher.
-- **Works anywhere**: Waybar, tmux and Starship status modules, a desktop
-  entry, freedesktop notifications and sounds.
-- 11 layouts, 19 built-in themes plus your own, and ambient effects (stars,
-  snow, rain, embers, scanline).
-- Sessions, projects, streaks, recaps, CSV/JSON export and Markdown weekly
-  reports, all in a local SQLite database.
+- **Set up once.** The first launch asks five questions (rhythm, daily goal,
+  autopilot, reminders, notifications). After that, `pomogo` just runs.
+- **Autopilot.** Focus rolls into breaks and back on its own, Pomodoro style,
+  or plan a 1–4 hour **deep focus** block.
+- **Looks after you.** While you focus: rest your eyes every 20 minutes, a
+  glass of water every 45, a stretch every hour. Breaks reset what they
+  already cover, and every break suggests one concrete thing to do.
+- **A daily goal.** Today's focus time, the goal, your streak and glasses of
+  water, on screen and in your bar.
+- **Remembers everything.** Sessions, tasks, projects, streaks, recaps,
+  CSV/JSON export and Markdown weekly reports, in a local SQLite database.
+- **Omarchy-native.** A bar widget for `omarchy-shell`, colors that follow
+  `omarchy theme set` live, pause on lock, and Omarchy's TUI launcher.
+- **Works anywhere.** Waybar, tmux and Starship modules, a desktop entry,
+  freedesktop notifications and sounds.
+- **Yours to style.** A clean default `focus` screen plus 11 other layouts,
+  19 built-in themes (and your own), and ambient effects.
 
 ## Install
 
@@ -118,9 +125,10 @@ GNOME, KDE and others. Run `pomogo doctor` to see what's available.
 
 | Key | Action |
 |---|---|
-| `s` | Start |
-| `space` | Pause / resume |
+| `enter` | Start, pause or resume (`s` and `space` also work) |
 | `n` | Skip segment |
+| `w` | Log a glass of water |
+| `esc` | Dismiss a reminder |
 | `r` | Reset |
 | `t` / `p` | Set task / project (with autocomplete) |
 | `d` | Choose a Deep Focus duration |
@@ -137,6 +145,7 @@ GNOME, KDE and others. Run `pomogo doctor` to see what's available.
 
 ```text
 pomogo [--theme T] [--layout L] [--effects E] [--task T] [--project P] [--work MIN] [--break-time MIN] [--zen]
+pomogo setup                     answer the setup questions again
 pomogo start [profile|project]   start with a profile from config.toml or a project
 pomogo toggle | skip             control the running TUI (bars, keybindings)
 pomogo status [--format default|waybar|tmux|json]
@@ -152,7 +161,9 @@ pomogo doctor | completion <shell> | version
 
 ## Configuration
 
-`pomogo config init` writes a commented `~/.config/pomogo/config.toml`:
+`pomogo setup` (or the first launch) writes a short, commented
+`~/.config/pomogo/config.toml`. `pomogo config init` writes the same file with
+defaults. The important settings:
 
 ```toml
 work_duration = 25
@@ -160,17 +171,20 @@ short_break_duration = 5
 long_break_duration = 15
 sessions_before_long_break = 4
 
-theme = "auto"          # Omarchy palette on Omarchy, tokyo-night elsewhere
-layout = "classic"
-effects = "none"
+autopilot = true            # focus and breaks start on their own
+daily_goal_minutes = 240    # 0 hides the goal
 
-pause_on_lock = true
-show_git = true
+[wellness]                  # minutes of focus between reminders, 0 = off
+eyes_minutes = 20
+water_minutes = 45
+stretch_minutes = 60
 
-[profiles.coding]       # pomogo start coding
+# theme = "auto"            # Omarchy palette on Omarchy, tokyo-night elsewhere
+# layout = "focus"
+
+[profiles.writing]          # pomogo start writing
 work_duration = 50
-layout = "dashboard"
-project = "Dev"
+project = "Writing"
 ```
 
 Custom themes go in `~/.config/pomogo/themes/*.toml`.
@@ -180,7 +194,7 @@ Custom themes go in `~/.config/pomogo/themes/*.toml`.
 | Path | Contents |
 |---|---|
 | `~/.config/pomogo/config.toml` | settings and profiles |
-| `~/.local/share/pomogo/pomogo.db` | sessions, blocks and projects (shared with the Go release) |
+| `~/.local/share/pomogo/pomogo.db` | sessions, blocks, projects and water log (shared with the Go release) |
 | `$XDG_RUNTIME_DIR/pomogo/state.json` | live session state, updated every second while the TUI runs |
 
 ## Development
