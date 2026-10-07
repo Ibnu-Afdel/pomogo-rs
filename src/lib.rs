@@ -13,3 +13,4 @@ pub mod theme;
 pub mod timer;
 pub mod ui;
 
+pub mod wellness;
