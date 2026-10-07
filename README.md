@@ -24,7 +24,14 @@ your stats.
 
 ## Install
 
-You need a Rust toolchain and a C compiler (for the bundled SQLite):
+**Arch / Omarchy** (from the AUR; replaces the Go `pomogo-bin`):
+
+```sh
+yay -S pomogo
+pomogo omarchy install    # on Omarchy: add the bar widget
+```
+
+**Any distro**: you need a Rust toolchain and a C compiler (for the bundled SQLite):
 
 | Distro       | Command                                  |
 |--------------|------------------------------------------|
@@ -47,7 +54,8 @@ your session history. Set `PREFIX` to install somewhere other than
 
 If the Go release is still installed (for example `pomogo-bin` from the AUR),
 the installer tells you which `pomogo` wins on your `PATH`. On Omarchy
-`~/.local/bin` comes first, so the Rust build is used.
+`~/.local/bin` comes first, so the Rust build is used. The AUR package
+replaces `pomogo-bin` directly.
 
 ## Omarchy
 
@@ -59,6 +67,11 @@ pomogo omarchy status        # check detection, palette and widget state
 pomogo omarchy keybindings   # print suggested Hyprland bindings
 pomogo omarchy uninstall     # remove the widget from the bar
 ```
+
+The widget is also published on its own as
+[omarchy-pomogo](https://github.com/Ibnu-Afdel/omarchy-pomogo), so it can
+be managed by Omarchy's plugin manager instead:
+`omarchy plugin add https://github.com/Ibnu-Afdel/omarchy-pomogo.git --enable`.
 
 **Bar widget** (`pomogo.timer`). It shows the running segment, dims while
 paused and hides when PomoGo is closed:
@@ -179,7 +192,13 @@ cargo run -- screenshot-preview --layout dashboard --theme auto
 
 The bar widget lives in [`contrib/omarchy/plugin`](contrib/omarchy/plugin) and
 is embedded into the binary at build time. Check it with
-`omarchy plugin validate contrib/omarchy/plugin`.
+`omarchy plugin validate contrib/omarchy/plugin` and publish it to the
+standalone repo with `scripts/publish-omarchy-plugin.sh`.
+
+The AUR recipe is in [`contrib/aur`](contrib/aur). To release: bump the
+version in `Cargo.toml` and the plugin manifest, tag `vX.Y.Z`, then update
+`pkgver`, run `updpkgsums` and `makepkg --printsrcinfo > .SRCINFO`, and push
+both files to `ssh://aur@aur.archlinux.org/pomogo.git`.
 
 ## License
 
