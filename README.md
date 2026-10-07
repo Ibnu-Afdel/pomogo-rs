@@ -1,199 +1,186 @@
-# PomoGo (Rust Edition) 🦀
+# PomoGo
 
-> Sleek, distraction-free Pomodoro timer TUI for Linux, developers, and rice enthusiasts with **first-party Omarchy Linux support**.
+A calm, keyboard-driven Pomodoro and deep-focus timer for the Linux terminal,
+built for [Omarchy](https://omarchy.org/) first and at home on any other
+distro.
 
-A ground-up, high-performance Rust rewrite of [Pomogo](../pomogo), preserving complete data compatibility with existing SQLite session stores while delivering instant startup, zero runtime dependencies, robust memory safety, and native Omarchy Linux desktop integration.
-
----
+This is the Rust rewrite of [PomoGo](https://github.com/Ibnu-Afdel/pomogo). It
+reads and continues the Go release's session history, so switching over keeps
+your stats.
 
 ## Highlights
 
-- 🎨 **First-Party Omarchy Linux Support**:
-  - Live color palette extraction from `~/.local/state/omarchy/current/theme/colors.toml`.
-  - Seamless desktop integration with native Quickshell top-bar widget (`PomogoBar.qml`).
-  - Pre-configured Hyprland floating window rules and keybindings.
-  - Dedicated CLI management via `pomogo omarchy status` & `pomogo omarchy install-quickshell`.
-- 📐 **11 Responsive Terminal Layouts**:
-  - `classic`, `minimal`, `centered`, `compact`, `retro`, `dashboard`, `monolith`, `tinybar`, `terminal-rice`, `focus-stack`, `command-center`.
-  - Supports `--layout random` or `--layout daily`.
-- ✨ **Ambient Particle Backgrounds**:
-  - `stars`, `snow`, `rain`, `embers`, and `scanline`.
-- 🗄️ **Zero-Migration SQLite Store**:
-  - Automatically loads and continues sessions from existing Go PomoGo database (`~/.local/share/pomogo/pomogo.db`).
-  - Schema migrations 1–7 preserved.
-- ⚡ **IPC & Status Bar Ecosystem**:
-  - Real-time atomic state written to `$XDG_RUNTIME_DIR/pomogo/state.json`.
-  - Status formatters for Waybar (`pomogo status --format waybar`), Tmux, Starship, and raw JSON.
-- 🔒 **Linux Desktop Awareness**:
-  - D-Bus `LockedHint` system-lock auto-pausing.
-  - Freedesktop notification action buttons via `notify-rust`.
-  - Canberra GTK audio cues (`canberra-gtk-play`) with fallback terminal bell.
-  - Active Git branch and Tmux session detection.
+- **Quick Focus** (classic 25/5 cycles) and **Deep Focus** (1–4 hour blocks
+  with breaks planned behind the scenes).
+- **Omarchy-native**: a bar widget for `omarchy-shell`, colors that follow
+  `omarchy theme set` live, pausing when the screen locks, and launching
+  through Omarchy's TUI launcher.
+- **Works anywhere**: Waybar, tmux and Starship status modules, a desktop
+  entry, freedesktop notifications and sounds.
+- 11 layouts, 19 built-in themes plus your own, and ambient effects (stars,
+  snow, rain, embers, scanline).
+- Sessions, projects, streaks, recaps, CSV/JSON export and Markdown weekly
+  reports, all in a local SQLite database.
 
----
+## Install
 
-## Installation & Build
+You need a Rust toolchain and a C compiler (for the bundled SQLite):
 
-### Prerequisites
-- Rust 1.75+ (via `rustup`)
-- Linux packages: `libcanberra-gtk3-module` / `canberra-gtk-play`, `libdbus-1-dev` (optional for system lock detection)
+| Distro       | Command                                  |
+|--------------|------------------------------------------|
+| Omarchy/Arch | `sudo pacman -S --needed rust base-devel` |
+| Fedora       | `sudo dnf install cargo gcc`              |
+| Other        | [rustup.rs](https://rustup.rs) and your distro's C compiler |
 
-### Building
-```bash
-cd pomogo-rust
-cargo build --release
-```
-The optimized executable will be located at `target/release/pomogo`.
+Then:
 
-To install to `~/.local/bin`:
-```bash
-cargo install --path .
+```sh
+git clone <this repo> pomogo && cd pomogo
+./install.sh
 ```
 
----
+`install.sh` builds a release binary into `~/.local/bin/pomogo`, installs
+bash/zsh/fish completions and a desktop entry, and on Omarchy installs and
+enables the bar widget. `./install.sh --uninstall` removes all of it and keeps
+your session history. Set `PREFIX` to install somewhere other than
+`~/.local`.
 
-## Omarchy Linux Integration
+If the Go release is still installed (for example `pomogo-bin` from the AUR),
+the installer tells you which `pomogo` wins on your `PATH`. On Omarchy
+`~/.local/bin` comes first, so the Rust build is used.
 
-PomoGo Rust provides first-party integration with [Omarchy Linux](https://omarchy.org/):
+## Omarchy
 
-1. **Verify Environment**:
-   ```bash
-   pomogo omarchy status
-   ```
-2. **Install Native Quickshell Widget**:
-   ```bash
-   pomogo omarchy install-quickshell
-   ```
-3. **Automated Setup Script**:
-   ```bash
-   bash contrib/omarchy/omarchy-setup.sh
-   ```
+`./install.sh` does all of this for you. To manage it by hand:
 
-### Dynamic Palette
-When running under Omarchy, PomoGo automatically detects your active theme:
-```bash
-pomogo --theme omarchy
+```sh
+pomogo omarchy install       # add the bar widget to omarchy-shell and enable it
+pomogo omarchy status        # check detection, palette and widget state
+pomogo omarchy keybindings   # print suggested Hyprland bindings
+pomogo omarchy uninstall     # remove the widget from the bar
 ```
-If you switch your theme in Omarchy, PomoGo adapts seamlessly.
 
----
+**Bar widget** (`pomogo.timer`). It shows the running segment, dims while
+paused and hides when PomoGo is closed:
 
-## Keyboard Controls
+- click: open or focus PomoGo
+- right click: start, pause or resume
+- middle click: skip to the next segment
+
+Move it like any other widget, for example
+`omarchy bar move pomogo.timer --section right`. Its options (show the task
+name, show it while idle) are in Omarchy's bar settings.
+
+**Theme.** With the default `theme = "auto"`, PomoGo uses the active Omarchy
+palette and repaints as soon as you switch themes.
+
+**Keybindings.** Omarchy 4 configures Hyprland in Lua. Add these to
+`~/.config/hypr/bindings.lua` (the keys are unbound by default):
+
+```lua
+o.bind("SUPER + ALT + P", "PomoGo", { tui = "pomogo", focus = true })
+o.bind("SUPER + SHIFT + ALT + P", "PomoGo start/pause", "pomogo toggle")
+
+-- Optional: float the PomoGo window instead of tiling it.
+o.window("org.omarchy.pomogo", { tag = "+floating-window" })
+```
+
+**Lock screen.** With `pause_on_lock = true`, the timer pauses while
+Omarchy's lock screen is up and resumes when you unlock.
+
+## Other desktops
+
+- **Waybar**: see [`contrib/waybar/config.jsonc`](contrib/waybar/config.jsonc).
+- **tmux**: see [`contrib/tmux/pomogo.tmux`](contrib/tmux/pomogo.tmux).
+- **Starship**: see [`contrib/starship/pomogo.toml`](contrib/starship/pomogo.toml).
+- **Any compositor or WM**: bind `pomogo toggle` and `pomogo skip` to keys.
+  They control the running TUI from anywhere.
+
+Notifications go through the freedesktop notification service. Sounds use
+`canberra-gtk-play` when present, otherwise `pw-play` or `paplay` with the
+freedesktop sound theme. Pause-on-lock reads logind's `LockedHint` on
+GNOME, KDE and others. Run `pomogo doctor` to see what's available.
+
+## Keys
 
 | Key | Action |
-|:---:|:---|
-| <kbd>s</kbd> / <kbd>Space</kbd> | Start / Pause / Resume timer |
-| <kbd>n</kbd> | Skip to next phase |
-| <kbd>r</kbd> | Reset current session |
-| <kbd>t</kbd> | Set active task name |
-| <kbd>p</kbd> | Select or manage active project |
-| <kbd>d</kbd> | Quick duration picker |
-| <kbd>z</kbd> | Toggle Zen mode (hide UI chrome) |
-| <kbd>m</kbd> | Toggle sound mute |
-| <kbd>S</kbd> | Open sound profile picker |
-| <kbd>i</kbd> | Open focus stats dashboard |
-| <kbd>c</kbd> | Copy timer status to clipboard (OSC 52) |
-| <kbd>?</kbd> | Open help dialog |
-| <kbd>q</kbd> | Exit PomoGo |
+|---|---|
+| `s` | Start |
+| `space` | Pause / resume |
+| `n` | Skip segment |
+| `r` | Reset |
+| `t` / `p` | Set task / project (with autocomplete) |
+| `d` | Choose a Deep Focus duration |
+| `tab` | Stats |
+| `y` | Copy stats to the clipboard |
+| `T` / `L` / `e` | Cycle theme / layout / ambient effect |
+| `v` | Cycle the activity label |
+| `a` | Sound picker |
+| `S` | Zen mode (hide hints, for screenshots) |
+| `?` | Help |
+| `q`, `ctrl+c` | Quit (the session is saved and offered for restore next time) |
 
----
+## Commands
 
-## CLI Reference
-
-```
-pomogo [COMMAND]
-
-Commands:
-  start               Start a focus session with optional profile or flags
-  status              Print current session status (for Waybar, Tmux, polybar)
-  stats               Display today's metrics, streaks, and focus history
-  history             View recent completed sessions
-  projects            List, add, or archive focus projects
-  themes              List all 19 built-in themes and Omarchy palette
-  screenshot-preview  Render a terminal preview of any layout and theme
-  recap               Show summary of today's focus sessions
-  export              Export session data as JSON or CSV
-  report              Generate Markdown weekly focus report
-  doctor              Run system diagnostics and verify dependencies
-  omarchy             Manage Omarchy Linux first-party integration
-  completion          Generate shell completions (bash, zsh, fish)
-  config              Inspect or initialize ~/.config/pomogo/config.toml
-  version             Print version information
+```text
+pomogo [--theme T] [--layout L] [--effects E] [--task T] [--project P] [--work MIN] [--break-time MIN] [--zen]
+pomogo start [profile|project]   start with a profile from config.toml or a project
+pomogo toggle | skip             control the running TUI (bars, keybindings)
+pomogo status [--format default|waybar|tmux|json]
+pomogo stats [--week|--month] | history | recap
+pomogo report [--start DATE --end DATE]
+pomogo export [--format json|csv] [--start DATE --end DATE]
+pomogo projects [list|add|archive]
+pomogo themes | screenshot-preview
+pomogo config init [--force]
+pomogo omarchy [status|install|uninstall|keybindings|install-desktop]
+pomogo doctor | completion <shell> | version
 ```
 
-### Examples
-- **Preview a rice layout with Omarchy theme**:
-  ```bash
-  pomogo screenshot-preview --layout terminal-rice --theme omarchy
-  ```
-- **Run system health check**:
-  ```bash
-  pomogo doctor
-  ```
-- **Waybar configuration**:
-  ```json
-  "custom/pomogo": {
-      "exec": "pomogo status --format waybar",
-      "return-type": "json",
-      "interval": 1,
-      "on-click": "pomogo",
-      "signal": 10
-  }
-  ```
+## Configuration
 
----
+`pomogo config init` writes a commented `~/.config/pomogo/config.toml`:
 
-## Architecture & Code Layout
+```toml
+work_duration = 25
+short_break_duration = 5
+long_break_duration = 15
+sessions_before_long_break = 4
 
-```
-pomogo-rust/
-├── Cargo.toml
-├── src/
-│   ├── main.rs            # Clap CLI router & argument parsing
-│   ├── lib.rs             # Public library exports
-│   ├── timer.rs           # Pure Pomodoro state machine with Clock trait
-│   ├── session.rs         # Quick / Deep block planner and runner
-│   ├── config.rs          # TOML configuration loader and profile resolver
-│   ├── statefile.rs       # Atomic JSON state writing to XDG_RUNTIME_DIR
-│   ├── restore.rs         # Recovery and prompt for interrupted sessions
-│   ├── stats.rs           # Streaks, 7-day activity, and metrics calculation
-│   ├── notify.rs          # D-Bus freedesktop notifications & Canberra audio
-│   ├── devinfo.rs         # Git worktree/branch traversal & Tmux detection
-│   ├── omarchy.rs         # Omarchy CLI actions & integration helpers
-│   ├── theme/
-│   │   ├── mod.rs         # 19 built-in palettes & theme resolver
-│   │   ├── omarchy.rs     # Live colors.toml loader from Omarchy
-│   │   ├── contrast.rs    # WCAG 2.1 relative luminance calculator
-│   │   └── external.rs    # ~/.config/pomogo/themes/*.toml loader
-│   ├── store/
-│   │   ├── mod.rs         # SQLite connection & 7 schema migrations
-│   │   ├── models.rs      # DbSession, Project, BlockStore models
-│   │   └── export.rs      # JSON, CSV, and Markdown report generators
-│   ├── integrations/
-│   │   ├── status.rs      # Waybar, Tmux, JSON status line formatters
-│   │   ├── dbus.rs        # systemd-logind LockedHint monitor
-│   │   └── doctor.rs      # System health and environment check
-│   ├── render/
-│   │   ├── mod.rs         # Frame, DisplayState, and layout resolver
-│   │   ├── bigclock.rs    # 5-row tall ANSI truecolor digit renderer
-│   │   ├── borders.rs     # Box border styles (rounded, thick, double, etc.)
-│   │   ├── widgets.rs     # Progress bars, dots, centering
-│   │   ├── ambient.rs     # Particle simulation (stars, snow, rain, embers)
-│   │   ├── text.rs        # Unicode width measuring & ANSI stripping
-│   │   └── *.rs           # 11 layout modules
-│   └── ui/
-│       ├── mod.rs         # Crossterm terminal loop & application state
-│       ├── keymap.rs      # Key bindings
-│       └── screens/       # Dialogs (help, stats, picker, sound, recap, etc.)
-└── contrib/
-    ├── omarchy/           # Quickshell QML widget & setup script
-    ├── waybar/            # Waybar modules
-    ├── tmux/              # Tmux statusbar snippet
-    └── starship/          # Starship prompt snippet
+theme = "auto"          # Omarchy palette on Omarchy, tokyo-night elsewhere
+layout = "classic"
+effects = "none"
+
+pause_on_lock = true
+show_git = true
+
+[profiles.coding]       # pomogo start coding
+work_duration = 50
+layout = "dashboard"
+project = "Dev"
 ```
 
----
+Custom themes go in `~/.config/pomogo/themes/*.toml`.
+
+## Files
+
+| Path | Contents |
+|---|---|
+| `~/.config/pomogo/config.toml` | settings and profiles |
+| `~/.local/share/pomogo/pomogo.db` | sessions, blocks and projects (shared with the Go release) |
+| `$XDG_RUNTIME_DIR/pomogo/state.json` | live session state, updated every second while the TUI runs |
+
+## Development
+
+```sh
+cargo test
+cargo run -- screenshot-preview --layout dashboard --theme auto
+```
+
+The bar widget lives in [`contrib/omarchy/plugin`](contrib/omarchy/plugin) and
+is embedded into the binary at build time. Check it with
+`omarchy plugin validate contrib/omarchy/plugin`.
 
 ## License
-MIT / Apache-2.0
 
+MIT
