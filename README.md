@@ -35,7 +35,7 @@ You need a Rust toolchain and a C compiler (for the bundled SQLite):
 Then:
 
 ```sh
-git clone <this repo> pomogo && cd pomogo
+git clone https://github.com/Ibnu-Afdel/pomogo-rs.git && cd pomogo-rs
 ./install.sh
 ```
 
