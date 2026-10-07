@@ -1,7 +1,7 @@
 // Aggregation and calculation of focus metrics and streaks.
 
 use std::collections::BTreeMap;
-use chrono::{DateTime, Datelike, Duration, Local, NaiveDate};
+use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use crate::store::models::DbSession;
 
 #[derive(Debug, Clone, Default)]
@@ -154,6 +154,16 @@ pub fn calculate(
     }
 
     stats
+}
+
+/// Start of today in local time, as UTC.
+pub fn local_midnight_utc() -> DateTime<Utc> {
+    Local::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .and_then(|t| t.and_local_timezone(Local).earliest())
+        .map(|t| t.with_timezone(&Utc))
+        .unwrap_or_else(Utc::now)
 }
 
 #[cfg(test)]

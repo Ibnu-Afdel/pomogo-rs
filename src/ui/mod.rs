@@ -34,7 +34,7 @@ use crate::render::{
 use crate::restore::{can_restore, restore_runner, RestoreDurations};
 use crate::session::{Block, Mode, Runner, RunnerEventType};
 use crate::statefile::{Companion, StateManager};
-use crate::stats::calculate as calculate_stats;
+use crate::stats::{calculate as calculate_stats, local_midnight_utc};
 use crate::store::models::{BlockStore, DbSession};
 use crate::store::Store;
 use crate::theme::omarchy::omarchy_colors_mtime;
@@ -1347,16 +1347,6 @@ fn fmt_hm(d: Duration) -> String {
         (h, 0) => format!("{}h", h),
         (h, m) => format!("{}h {}m", h, m),
     }
-}
-
-/// Start of today in local time, as UTC.
-fn local_midnight_utc() -> DateTime<Utc> {
-    Local::now()
-        .date_naive()
-        .and_hms_opt(0, 0, 0)
-        .and_then(|t| t.and_local_timezone(Local).earliest())
-        .map(|t| t.with_timezone(&Utc))
-        .unwrap_or_else(Utc::now)
 }
 
 fn get_verb_for_task(task: &str) -> String {

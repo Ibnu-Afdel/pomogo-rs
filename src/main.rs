@@ -17,7 +17,7 @@ use pomogo_rust::render::{
     resolve_effects_name, resolve_layout, resolve_layout_name, DisplayState, Frame,
 };
 use pomogo_rust::statefile::{signal_running, RemoteAction, StateManager};
-use pomogo_rust::stats::calculate as calculate_stats;
+use pomogo_rust::stats::{calculate as calculate_stats, local_midnight_utc};
 use pomogo_rust::store::models::Project;
 use pomogo_rust::store::Store;
 use pomogo_rust::theme::{get as get_theme, list as list_themes, resolve_theme_name};
@@ -325,9 +325,19 @@ fn handle_stats(week: bool, month: bool) {
         return;
     }
 
+    let cfg = Config::load().unwrap_or_default();
+    let water = store.count_wellness_since("water", local_midnight_utc()).unwrap_or(0);
+
     println!("PomoGo Focus Statistics:");
     println!("------------------------");
     println!("Today Completed:    {} sessions ({} mins focused)", s.today_count, s.today_minutes);
+    if cfg.daily_goal_minutes > 0 {
+        let pct = s.today_minutes as f64 / cfg.daily_goal_minutes as f64 * 100.0;
+        println!("Daily Goal:         {} of {} mins ({:.0}%)", s.today_minutes, cfg.daily_goal_minutes, pct);
+    }
+    if water > 0 {
+        println!("Water Today:        {} glasses", water);
+    }
     println!("Current Streak:     {} days", s.current_streak);
     println!("Best Streak:        {} days", s.best_streak);
     println!("Monthly Completed:  {} sessions (Rate: {:.0}%)", s.month_count, s.completion_rate * 100.0);
