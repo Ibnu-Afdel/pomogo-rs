@@ -3,6 +3,8 @@ pub mod screens;
 
 use std::io::{stdout, Write};
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration as StdDuration, Instant, SystemTime};
 
 use chrono::{DateTime, Duration, Local, Utc};
@@ -15,6 +17,9 @@ use crossterm::{
         EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen,
     },
 };
+
+use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
+use signal_hook::flag as signal_flag;
 
 use crate::config::{db_file_path, Config};
 use crate::devinfo::{find_git_branch, get_tmux_session};
@@ -211,6 +216,17 @@ impl App {
             default_hook(info);
         }));
 
+        // Closing the terminal window (SIGHUP) or a plain `kill` should save
+        // the session like `q` does; SIGUSR1/SIGUSR2 are `pomogo toggle`/`skip`.
+        let quit_flag = Arc::new(AtomicBool::new(false));
+        for sig in [SIGTERM, SIGHUP, SIGINT] {
+            signal_flag::register(sig, Arc::clone(&quit_flag))?;
+        }
+        let toggle_flag = Arc::new(AtomicBool::new(false));
+        signal_flag::register(SIGUSR1, Arc::clone(&toggle_flag))?;
+        let skip_flag = Arc::new(AtomicBool::new(false));
+        signal_flag::register(SIGUSR2, Arc::clone(&skip_flag))?;
+
         enable_raw_mode()?;
         let mut stdout = stdout();
         execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
@@ -228,6 +244,17 @@ impl App {
         let clock = RealClock;
 
         loop {
+            if quit_flag.load(Ordering::Relaxed) {
+                break;
+            }
+            if toggle_flag.swap(false, Ordering::Relaxed) {
+                let key = if self.runner.timer.is_running { ' ' } else { 's' };
+                self.handle_main_key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE))?;
+            }
+            if skip_flag.swap(false, Ordering::Relaxed) {
+                self.handle_main_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE))?;
+            }
+
             // Check status message timeout
             if let Some(t) = self.status_clear_at {
                 if Instant::now() >= t {
@@ -321,9 +348,12 @@ impl App {
                         }
                     }
 
-                    self.write_state();
                     self.update_terminal_title();
                 }
+
+                // Heartbeat: bar widgets treat a state file that stops
+                // updating as "PomoGo is no longer running".
+                self.write_state();
             }
         }
 
