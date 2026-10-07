@@ -331,80 +331,120 @@ impl Config {
     }
 
     pub fn write_default(force: bool) -> Result<PathBuf, String> {
-        let dir = xdg_config_dir();
-        fs::create_dir_all(&dir)
-            .map_err(|e| format!("failed to create config directory {}: {}", dir.display(), e))?;
-
-        let file = config_file_path();
-        if file.exists() && !force {
-            return Err(format!(
-                "{} already exists (use --force to overwrite it)",
-                file.display()
-            ));
-        }
-        let default_content = r#"# PomoGo Configuration File
-# Location: ~/.config/pomogo/config.toml
-
-# Durations in minutes
-work_duration = 25
-short_break_duration = 5
-long_break_duration = 15
-sessions_before_long_break = 4
-
-# Theming: "auto", "omarchy", "tokyo-night", "catppuccin", "gruvbox", "rose-pine",
-# "nord", "everforest", "dracula", "kanagawa", "random", "daily"
-# "auto" follows the active Omarchy theme (and its live changes) on Omarchy,
-# and uses tokyo-night everywhere else. Run `pomogo themes` for the full list.
-theme = "auto"
-
-# Layout: "classic", "minimal", "centered", "compact", "retro", "dashboard",
-# "monolith", "tinybar", "terminal-rice", "focus-stack", "command-center", "random", "daily"
-layout = "classic"
-
-# Ambient Background Effects: "none", "stars", "snow", "rain", "embers", "scanline", "random"
-effects = "none"
-
-# Notifications & Audio
-notifications_enabled = true
-sound_enabled = true
-sound_start_event = "message-new-instant"
-sound_end_event = "complete"
-
-# Options
-prompt_for_notes = true
-pause_on_lock = true
-pause_on_suspend = true
-terminal_title_enabled = true
-show_git = true
-show_tmux = false
-
-# Quick Focus overrides
-[quick_focus]
-auto_advance = false
-
-# Deep Focus overrides
-[deep_focus]
-default_duration = 120
-
-# Optional Profiles: e.g. run with 'pomogo start coding'
-[profiles.coding]
-work_duration = 50
-short_break_duration = 10
-layout = "dashboard"
-project = "Dev"
-
-[profiles.review]
-work_duration = 20
-short_break_duration = 5
-layout = "compact"
-project = "Code Review"
-"#;
-
-        fs::write(&file, default_content)
-            .map_err(|e| format!("failed to write config file {}: {}", file.display(), e))?;
-
-        Ok(file)
+        write_config(&SetupChoices::default(), force)
     }
+}
+
+/// The handful of choices `pomogo setup` asks about; everything else in the
+/// generated config keeps its default.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SetupChoices {
+    pub work: usize,
+    pub short_break: usize,
+    pub long_break: usize,
+    pub long_break_every: usize,
+    pub daily_goal_minutes: u32,
+    pub autopilot: bool,
+    pub reminders: bool,
+    pub notifications: bool,
+}
+
+impl Default for SetupChoices {
+    fn default() -> Self {
+        Self {
+            work: 25,
+            short_break: 5,
+            long_break: 15,
+            long_break_every: 4,
+            daily_goal_minutes: default_daily_goal(),
+            autopilot: true,
+            reminders: true,
+            notifications: true,
+        }
+    }
+}
+
+/// Renders a commented config.toml for the given choices.
+pub fn config_toml(c: &SetupChoices) -> String {
+    let wellness = if c.reminders { WellnessConfig::default() } else { WellnessConfig::off() };
+    format!(
+        r#"# PomoGo configuration (~/.config/pomogo/config.toml)
+# Re-run `pomogo setup` any time to answer the questions again.
+
+# Focus rhythm, in minutes.
+work_duration = {work}
+short_break_duration = {short}
+long_break_duration = {long}
+sessions_before_long_break = {every}
+
+# Roll from focus into breaks and back without waiting for a key.
+autopilot = {autopilot}
+
+# Focus time to aim for each day, in minutes (0 hides the goal).
+daily_goal_minutes = {goal}
+
+# Body reminders while you focus, in minutes of focus (0 turns one off).
+[wellness]
+eyes_minutes = {eyes}
+water_minutes = {water}
+stretch_minutes = {stretch}
+
+# --- Everything below is optional ------------------------------------------
+# Looks: theme "auto" follows your Omarchy theme (tokyo-night elsewhere).
+# Run `pomogo themes` for all themes. Layouts: focus, classic, minimal,
+# centered, compact, retro, dashboard, monolith, tinybar, terminal-rice,
+# focus-stack, command-center.
+# theme = "auto"
+# layout = "focus"
+# effects = "none"      # stars, snow, rain, embers, scanline
+
+notifications_enabled = {notify}
+sound_enabled = {notify}
+pause_on_lock = true
+
+# Ask for a note when a deep focus block ends.
+prompt_for_notes = true
+
+# Commands to run when focus or a break starts.
+# on_work_start = "makoctl mode -a do-not-disturb"
+# on_break_start = "makoctl mode -r do-not-disturb"
+
+# Profiles: `pomogo start writing` applies these on top of the above.
+# [profiles.writing]
+# work_duration = 50
+# short_break_duration = 10
+# project = "Writing"
+"#,
+        work = c.work,
+        short = c.short_break,
+        long = c.long_break,
+        every = c.long_break_every,
+        autopilot = c.autopilot,
+        goal = c.daily_goal_minutes,
+        eyes = wellness.eyes_minutes,
+        water = wellness.water_minutes,
+        stretch = wellness.stretch_minutes,
+        notify = c.notifications,
+    )
+}
+
+/// Writes config.toml for `choices`, refusing to replace an existing file
+/// unless `force` is set.
+pub fn write_config(choices: &SetupChoices, force: bool) -> Result<PathBuf, String> {
+    let dir = xdg_config_dir();
+    fs::create_dir_all(&dir)
+        .map_err(|e| format!("failed to create config directory {}: {}", dir.display(), e))?;
+
+    let file = config_file_path();
+    if file.exists() && !force {
+        return Err(format!(
+            "{} already exists (use --force to overwrite it)",
+            file.display()
+        ));
+    }
+    fs::write(&file, config_toml(choices))
+        .map_err(|e| format!("failed to write config file {}: {}", file.display(), e))?;
+    Ok(file)
 }
 
 #[cfg(test)]
@@ -435,6 +475,32 @@ mod tests {
         assert!(cfg.validate().is_err());
         cfg.effects = "none".to_string();
         assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_generated_config_round_trips() {
+        let choices = SetupChoices {
+            work: 50,
+            short_break: 10,
+            long_break: 20,
+            long_break_every: 3,
+            daily_goal_minutes: 300,
+            autopilot: false,
+            reminders: false,
+            notifications: true,
+        };
+        let cfg: Config = toml::from_str(&config_toml(&choices)).expect("valid toml");
+        cfg.validate().unwrap();
+        assert_eq!(cfg.work_duration, 50);
+        assert_eq!(cfg.sessions_before_long_break, 3);
+        assert_eq!(cfg.daily_goal_minutes, 300);
+        assert!(!cfg.autopilot);
+        assert!(!cfg.wellness.any_enabled());
+        assert_eq!(cfg.theme, "auto");
+        assert_eq!(cfg.layout, "focus");
+
+        let defaults: Config = toml::from_str(&config_toml(&SetupChoices::default())).unwrap();
+        assert_eq!(defaults.wellness, WellnessConfig::default());
     }
 
     #[test]
