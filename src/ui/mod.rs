@@ -33,7 +33,7 @@ use crate::render::{
 };
 use crate::restore::{can_restore, restore_runner, RestoreDurations};
 use crate::session::{Block, Mode, Runner, RunnerEventType};
-use crate::statefile::StateManager;
+use crate::statefile::{Companion, StateManager};
 use crate::stats::calculate as calculate_stats;
 use crate::store::models::{BlockStore, DbSession};
 use crate::store::Store;
@@ -1101,6 +1101,12 @@ impl App {
                 self.current_project_id,
                 Some(&self.current_project_name),
                 self.current_block_id,
+                &Companion {
+                    today_focus_secs: self.today_focus().num_seconds(),
+                    daily_goal_secs: self.daily_goal().num_seconds(),
+                    water_today: self.water_today,
+                    nudge: self.nudge.map(|(n, _)| n.as_str().to_string()),
+                },
             );
         }
     }

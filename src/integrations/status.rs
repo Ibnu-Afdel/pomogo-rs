@@ -76,6 +76,13 @@ pub fn format_status(state: Option<&State>, format: &str) -> Result<String, Stri
             tooltip = format!("Task: {}\n{}", t, tooltip);
         }
     }
+    if st.daily_goal_secs > 0 {
+        tooltip.push_str(&format!(
+            "\nToday: {} of {}",
+            fmt_hm(st.today_focus_secs),
+            fmt_hm(st.daily_goal_secs)
+        ));
+    }
 
     match format {
         "waybar" => {
@@ -118,6 +125,15 @@ fn is_idle(state: Option<&State>) -> bool {
             }
             false
         }
+    }
+}
+
+fn fmt_hm(secs: i64) -> String {
+    let mins = secs.max(0) / 60;
+    match (mins / 60, mins % 60) {
+        (0, m) => format!("{}m", m),
+        (h, 0) => format!("{}h", h),
+        (h, m) => format!("{}h {}m", h, m),
     }
 }
 
@@ -168,6 +184,7 @@ mod tests {
             segment_count: 1,
             block_id: None,
             planned_total_secs: 1500,
+            ..Default::default()
         };
 
         let tmux = format_status(Some(&state), "tmux").unwrap();
@@ -178,6 +195,10 @@ mod tests {
         assert_eq!(val["text"], "🍅 25:00");
         assert_eq!(val["class"], "pomogo-work");
         assert!(val["tooltip"].as_str().unwrap().contains("Task: Refactor"));
+
+        let with_goal = State { today_focus_secs: 95 * 60, daily_goal_secs: 4 * 3600, ..state };
+        let waybar = format_status(Some(&with_goal), "waybar").unwrap();
+        assert!(waybar.contains("Today: 1h 35m of 4h"));
     }
 }
 

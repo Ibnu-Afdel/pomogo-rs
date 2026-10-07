@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::session::{Mode, Runner};
 use crate::timer::{SessionPhase, SessionState};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct State {
     pub version: usize,
     pub mode: String,
@@ -40,6 +40,27 @@ pub struct State {
     pub block_id: Option<i64>,
     #[serde(default)]
     pub planned_total_secs: i64,
+
+    /// Focus seconds logged today, including the running segment.
+    #[serde(default)]
+    pub today_focus_secs: i64,
+    /// Daily focus goal in seconds; 0 when no goal is set.
+    #[serde(default)]
+    pub daily_goal_secs: i64,
+    #[serde(default)]
+    pub water_today: usize,
+    /// Body reminder currently on screen ("eyes", "water" or "stretch").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nudge: Option<String>,
+}
+
+/// Day-level details from the TUI that bars and scripts can show.
+#[derive(Debug, Clone, Default)]
+pub struct Companion {
+    pub today_focus_secs: i64,
+    pub daily_goal_secs: i64,
+    pub water_today: usize,
+    pub nudge: Option<String>,
 }
 
 pub fn xdg_runtime_dir() -> PathBuf {
@@ -73,6 +94,7 @@ impl StateManager {
         project_id: Option<i64>,
         project_name: Option<&str>,
         block_id: Option<i64>,
+        companion: &Companion,
     ) -> Result<(), String> {
         let now = Utc::now();
         let remaining = if runner.timer.is_running && !runner.timer.is_paused {
@@ -131,6 +153,10 @@ impl StateManager {
             segment_count: runner.block.segments.len(),
             block_id,
             planned_total_secs: runner.block.planned_total.num_seconds(),
+            today_focus_secs: companion.today_focus_secs,
+            daily_goal_secs: companion.daily_goal_secs,
+            water_today: companion.water_today,
+            nudge: companion.nudge.clone(),
         };
 
         let json_str = serde_json::to_string_pretty(&state_val)
@@ -258,7 +284,7 @@ mod tests {
         );
         let runner = Runner::new(block);
         manager
-            .write(&runner, Some("Test Task"), Some(42), Some("Project X"), None)
+            .write(&runner, Some("Test Task"), Some(42), Some("Project X"), None, &Companion::default())
             .unwrap();
 
         let loaded = manager.read().unwrap().expect("state loaded");
@@ -296,6 +322,7 @@ mod tests {
             segment_count: 1,
             block_id: None,
             planned_total_secs: 1500,
+            ..Default::default()
         };
 
         // Self process is not stale
