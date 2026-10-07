@@ -37,9 +37,9 @@ impl Nudge {
 
     pub fn message(&self) -> &'static str {
         match self {
-            Nudge::Eyes => "Look at something 20 feet away for 20 seconds.",
-            Nudge::Water => "Have a glass of water. Press w when you have.",
-            Nudge::Stretch => "Roll your shoulders, stretch your back, then sit back down.",
+            Nudge::Eyes => "Look 20 feet away for 20 seconds.",
+            Nudge::Water => "Have a glass, then press w.",
+            Nudge::Stretch => "Roll your shoulders and stretch your back.",
         }
     }
 
