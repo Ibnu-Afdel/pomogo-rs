@@ -435,6 +435,15 @@ fn handle_screenshot_preview(
         zen,
         git_branch: "feature/focus-polish".to_string(),
         tmux_session: "work".to_string(),
+        today_focus: Duration::minutes(155),
+        daily_goal: Duration::minutes(240),
+        streak_days: 6,
+        water_today: 3,
+        next_up: "break in 19m  ·  eyes in 7m".to_string(),
+        nudge: None,
+        break_tip: String::new(),
+        hints: "enter pause  ·  n skip  ·  t task  ·  w water  ·  tab stats  ·  ? keys".to_string(),
+        toast: String::new(),
     };
 
     let rendered = layout_fn(&ds, &th, &frame);

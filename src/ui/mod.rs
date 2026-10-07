@@ -18,6 +18,7 @@ use crossterm::{
     },
 };
 
+use notify_rust::Urgency;
 use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
 use signal_hook::flag as signal_flag;
 
@@ -28,7 +29,7 @@ use crate::notify::{sound_profiles, Notifier};
 use crate::render::ambient::render_ambient;
 use crate::render::text::clip_visible;
 use crate::render::{
-    resolve_effects_name, resolve_layout, resolve_layout_name, DisplayState, Frame,
+    resolve_effects_name, resolve_layout, resolve_layout_name, DisplayState, Frame, LAYOUT_NAMES,
 };
 use crate::restore::{can_restore, restore_runner, RestoreDurations};
 use crate::session::{Block, Mode, Runner, RunnerEventType};
@@ -39,6 +40,7 @@ use crate::store::Store;
 use crate::theme::omarchy::omarchy_colors_mtime;
 use crate::theme::{self, Theme};
 use crate::timer::{RealClock, SessionPhase, SessionState};
+use crate::wellness::{break_tip, Nudge, Wellness};
 use crate::ui::keymap::KeyMap;
 use crate::ui::screens::{
     preset_duration, render_duration_picker, render_help, render_input, render_recap,
@@ -104,6 +106,17 @@ pub struct App {
     pub recap_info: Option<RecapInfo>,
     /// Last seen mtime of Omarchy's colors.toml, for following `omarchy theme set`.
     pub omarchy_palette_mtime: Option<SystemTime>,
+
+    pub wellness: Wellness,
+    /// The body reminder on screen and when it appeared.
+    pub nudge: Option<(Nudge, Instant)>,
+    /// Focus time from sessions already recorded today.
+    pub today_focus_done: Duration,
+    pub streak_days: usize,
+    pub water_today: usize,
+    /// Breaks taken this run, used to rotate break tips.
+    pub break_count: usize,
+    pub goal_reached_notified: bool,
 }
 
 impl App {
@@ -162,8 +175,9 @@ impl App {
         );
 
         let verb = get_verb_for_task(&current_task);
+        let wellness_cfg = cfg.wellness;
 
-        Self {
+        let mut app = Self {
             runner: Runner::new(block),
             cfg,
             theme: th,
@@ -204,7 +218,18 @@ impl App {
             last_lock_check: Instant::now(),
             recap_info: None,
             omarchy_palette_mtime: omarchy_colors_mtime(),
-        }
+            wellness: Wellness::new(wellness_cfg),
+            nudge: None,
+            today_focus_done: Duration::zero(),
+            streak_days: 0,
+            water_today: 0,
+            break_count: 0,
+            goal_reached_notified: false,
+        };
+        app.refresh_today();
+        app.goal_reached_notified = app.daily_goal() > Duration::zero()
+            && app.today_focus_done >= app.daily_goal();
+        app
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -307,13 +332,30 @@ impl App {
                 self.tick_count += 1;
                 self.follow_omarchy_theme();
 
+                if let Some((_, shown)) = self.nudge {
+                    if shown.elapsed() >= NUDGE_VISIBLE_FOR {
+                        self.nudge = None;
+                    }
+                }
+
                 if self.runner.timer.is_running && !self.runner.timer.is_paused {
                     let prev_phase = self.runner.timer.phase;
                     let started_at = self.runner.timer.started_at.unwrap_or_else(Utc::now);
 
+                    if prev_phase == SessionPhase::Work {
+                        for due in self.wellness.focus_elapsed(Duration::seconds(1)) {
+                            self.show_nudge(due);
+                        }
+                        self.check_daily_goal();
+                    }
+
                     if let Some(evt) = self.runner.tick(&clock) {
                         let dur = self.runner.block.current_segment.duration;
                         self.record_session(prev_phase, started_at, Utc::now(), true, dur);
+                        self.refresh_today();
+                        if evt.phase != SessionPhase::Work && evt.state != SessionState::Idle {
+                            self.begin_break();
+                        }
 
                         // Trigger notifications & sounds
                         self.notifier.notify_transition(evt.state, evt.phase);
@@ -344,7 +386,12 @@ impl App {
                                 self.show_recap_screen();
                             }
                         } else if self.selected_mode == Mode::Quick && prev_phase == SessionPhase::LongBreak {
-                            self.show_recap_screen();
+                            if self.runner.block.auto_advance {
+                                // Autopilot keeps going; don't cover the clock.
+                                self.set_status("Cycle complete. Nice work.");
+                            } else {
+                                self.show_recap_screen();
+                            }
                         }
                     }
 
@@ -424,6 +471,13 @@ impl App {
             KeyCode::Char('q') => return Ok(true),
             KeyCode::Char('?') => self.show_help = true,
             KeyCode::Tab => self.show_stats = !self.show_stats,
+            KeyCode::Enter => {
+                // One key for the common path: start when idle, else pause/resume.
+                let next = if self.runner.timer.is_running { ' ' } else { 's' };
+                return self.handle_main_key(KeyEvent::new(KeyCode::Char(next), KeyModifiers::NONE));
+            }
+            KeyCode::Char('w') => self.log_water(),
+            KeyCode::Esc => self.nudge = None,
             KeyCode::Char('y') => self.copy_stats_to_clipboard(),
             KeyCode::Char('s') => {
                 if !self.runner.timer.is_running {
@@ -475,6 +529,10 @@ impl App {
 
                     let (evt, _ok) = self.runner.skip(&clock);
                     self.record_session(prev_phase, started_at, Utc::now(), false, dur);
+                    self.refresh_today();
+                    if evt.event_type != RunnerEventType::BlockEnded && self.runner.timer.phase != SessionPhase::Work {
+                        self.begin_break();
+                    }
 
                     if evt.event_type == RunnerEventType::BlockEnded {
                         self.finish_block(false);
@@ -744,6 +802,111 @@ impl App {
         self.set_status(&format!("Deep Focus: {} min block", total.num_minutes()));
     }
 
+    fn daily_goal(&self) -> Duration {
+        Duration::minutes(self.cfg.daily_goal_minutes as i64)
+    }
+
+    /// Focus time today, including the part of the running focus segment
+    /// that has already elapsed.
+    fn today_focus(&self) -> Duration {
+        let timer = &self.runner.timer;
+        let running = if timer.is_running && timer.phase == SessionPhase::Work {
+            (self.runner.block.current_segment.duration - timer.remaining_time).max(Duration::zero())
+        } else {
+            Duration::zero()
+        };
+        self.today_focus_done + running
+    }
+
+    /// Reloads today's totals from the database.
+    fn refresh_today(&mut self) {
+        let Some(store) = &self.db_store else { return };
+        let now = Utc::now();
+        let sessions = store.get_sessions(now - Duration::days(400), now + Duration::days(1)).unwrap_or_default();
+        let stats = calculate_stats(&sessions, Local::now(), None);
+        self.today_focus_done = Duration::minutes(stats.today_minutes as i64);
+        self.streak_days = stats.current_streak;
+        self.water_today = store.count_wellness_since("water", local_midnight_utc()).unwrap_or(0);
+    }
+
+    fn show_nudge(&mut self, nudge: Nudge) {
+        self.nudge = Some((nudge, Instant::now()));
+        self.notifier.notify_custom(nudge.title(), nudge.message(), Urgency::Low);
+    }
+
+    fn check_daily_goal(&mut self) {
+        let goal = self.daily_goal();
+        if self.goal_reached_notified || goal == Duration::zero() || self.today_focus() < goal {
+            return;
+        }
+        self.goal_reached_notified = true;
+        let msg = format!("{} of focus today. Anything more is a bonus.", fmt_hm(goal));
+        self.notifier.notify_custom("Daily goal reached", &msg, Urgency::Normal);
+        self.set_status("Daily goal reached. Anything more is a bonus.");
+    }
+
+    fn begin_break(&mut self) {
+        self.break_count += 1;
+        self.wellness.break_started();
+        if matches!(self.nudge, Some((Nudge::Eyes | Nudge::Stretch, _))) {
+            self.nudge = None;
+        }
+    }
+
+    fn log_water(&mut self) {
+        if let Some(store) = &self.db_store {
+            let _ = store.log_wellness(Nudge::Water.as_str(), Utc::now());
+        }
+        self.water_today += 1;
+        self.wellness.done(Nudge::Water);
+        if matches!(self.nudge, Some((Nudge::Water, _))) {
+            self.nudge = None;
+        }
+        let glasses = if self.water_today == 1 { "glass" } else { "glasses" };
+        self.set_status(&format!("{} {} of water today", self.water_today, glasses));
+    }
+
+    fn hints(&self) -> String {
+        let timer = &self.runner.timer;
+        let mut keys: Vec<&str> = if !timer.is_running {
+            vec!["enter start", "t task", "p project", "d deep focus"]
+        } else if timer.is_paused {
+            vec!["enter resume", "n skip", "r reset", "t task"]
+        } else {
+            vec!["enter pause", "n skip", "t task"]
+        };
+        if self.cfg.wellness.water_minutes > 0 {
+            keys.push("w water");
+        }
+        if self.nudge.is_some() {
+            keys.push("esc dismiss");
+        }
+        keys.extend(["tab stats", "? keys"]);
+        keys.join("  ·  ")
+    }
+
+    fn next_up(&self) -> String {
+        let timer = &self.runner.timer;
+        if !timer.is_running {
+            let mins = self.runner.block.current_segment.duration.num_minutes();
+            return format!("press enter to start a {}-minute focus", mins);
+        }
+        let left = fmt_hm(timer.remaining_time + Duration::seconds(59));
+        let mut parts = vec![match timer.phase {
+            SessionPhase::Work => format!("break in {}", left),
+            _ if self.runner.block.auto_advance => format!("focus resumes in {}", left),
+            _ => format!("break ends in {}", left),
+        }];
+        if timer.phase == SessionPhase::Work {
+            if let Some((n, due)) = self.wellness.next_due() {
+                if due < timer.remaining_time {
+                    parts.push(format!("{} in {}", n.as_str(), fmt_hm(due + Duration::seconds(59))));
+                }
+            }
+        }
+        parts.join("  ·  ")
+    }
+
     /// Reloads the palette when the Omarchy theme changes underneath us.
     fn follow_omarchy_theme(&mut self) {
         if self.current_theme_name != "omarchy" {
@@ -769,15 +932,12 @@ impl App {
     }
 
     fn cycle_layout(&mut self) {
-        let layouts = [
-            "classic", "minimal", "centered", "compact", "retro", "dashboard",
-            "monolith", "tinybar", "terminal-rice", "focus-stack", "command-center",
-        ];
+        let layouts = LAYOUT_NAMES;
         if let Some(pos) = layouts.iter().position(|l| *l == self.current_layout_name.as_str()) {
             let next_pos = (pos + 1) % layouts.len();
             self.current_layout_name = layouts[next_pos].to_string();
         } else {
-            self.current_layout_name = "classic".to_string();
+            self.current_layout_name = "focus".to_string();
         }
         self.set_status(&format!("Layout: {}", self.current_layout_name));
     }
@@ -1084,8 +1244,19 @@ impl App {
             self.runner.block.current_segment.duration
         };
 
-        let progress = if total_block > Duration::zero() {
-            let elapsed = total_block - self.runner.block.remaining(self.runner.timer.remaining_time);
+        // Before the first start the timer holds no time yet; show the
+        // segment that is about to run instead of 00:00.
+        let idle = self.runner.timer.state == SessionState::Idle;
+        let segment_remaining = if idle && self.runner.timer.remaining_time <= Duration::zero() {
+            self.runner.block.current_segment.duration
+        } else {
+            self.runner.timer.remaining_time
+        };
+
+        let progress = if idle {
+            0.0
+        } else if total_block > Duration::zero() {
+            let elapsed = total_block - self.runner.block.remaining(segment_remaining);
             (elapsed.num_seconds() as f64 / total_block.num_seconds() as f64).clamp(0.0, 1.0)
         } else {
             0.0
@@ -1096,9 +1267,9 @@ impl App {
             project: self.current_project_name.clone(),
             task: self.current_task.clone(),
             phase_kind: self.runner.timer.phase,
-            segment_remaining: self.runner.timer.remaining_time,
+            segment_remaining,
             block_remaining: if self.runner.block.mode == Mode::Deep {
-                self.runner.block.remaining(self.runner.timer.remaining_time)
+                self.runner.block.remaining(segment_remaining)
             } else {
                 Duration::zero()
             },
@@ -1111,13 +1282,13 @@ impl App {
             },
             paused: self.runner.timer.is_paused,
             running: self.runner.timer.is_running,
-            idle: self.runner.timer.state == SessionState::Idle,
+            idle,
             status_message: if !self.status_message.is_empty() {
                 self.status_message.clone()
             } else if self.runner.timer.is_paused {
                 "paused".to_string()
             } else {
-                format!("focus · break in {}m", (self.runner.timer.remaining_time.num_seconds() + 59) / 60)
+                self.next_up()
             },
             hints_visibility: true,
             theme_name: self.current_theme_name.clone(),
@@ -1125,6 +1296,19 @@ impl App {
             zen: self.zen_mode,
             git_branch: self.git_branch.clone(),
             tmux_session: self.tmux_session.clone(),
+            today_focus: self.today_focus(),
+            daily_goal: self.daily_goal(),
+            streak_days: self.streak_days,
+            water_today: self.water_today,
+            next_up: self.next_up(),
+            nudge: self.nudge.map(|(n, _)| (n.glyph().to_string(), n.title().to_string(), n.message().to_string())),
+            break_tip: break_tip(
+                self.runner.timer.phase == SessionPhase::LongBreak,
+                self.break_count,
+            )
+            .to_string(),
+            hints: self.hints(),
+            toast: self.status_message.clone(),
         };
 
         let layout_output = layout_fn(&ds, &self.theme, frame);
@@ -1146,6 +1330,28 @@ impl App {
             }
         }
     }
+}
+
+/// How long a body reminder stays on screen unless dismissed.
+const NUDGE_VISIBLE_FOR: StdDuration = StdDuration::from_secs(90);
+
+fn fmt_hm(d: Duration) -> String {
+    let mins = d.num_minutes().max(0);
+    match (mins / 60, mins % 60) {
+        (0, m) => format!("{}m", m),
+        (h, 0) => format!("{}h", h),
+        (h, m) => format!("{}h {}m", h, m),
+    }
+}
+
+/// Start of today in local time, as UTC.
+fn local_midnight_utc() -> DateTime<Utc> {
+    Local::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .and_then(|t| t.and_local_timezone(Local).earliest())
+        .map(|t| t.with_timezone(&Utc))
+        .unwrap_or_else(Utc::now)
 }
 
 fn get_verb_for_task(task: &str) -> String {

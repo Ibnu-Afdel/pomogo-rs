@@ -6,6 +6,9 @@ use std::path::PathBuf;
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
 
+use crate::render::LAYOUT_NAMES;
+use crate::wellness::WellnessConfig;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     // Durations (in minutes)
@@ -35,6 +38,18 @@ pub struct Config {
     pub sound_start_event: String,
     #[serde(default = "default_sound_end")]
     pub sound_end_event: String,
+
+    /// Roll from focus into breaks and back without waiting for a key.
+    #[serde(default = "default_true")]
+    pub autopilot: bool,
+
+    /// Focus minutes to aim for each day; 0 hides the goal.
+    #[serde(default = "default_daily_goal")]
+    pub daily_goal_minutes: u32,
+
+    /// Eyes, water and stretch reminders while focusing.
+    #[serde(default)]
+    pub wellness: WellnessConfig,
 
     // Notes
     #[serde(default = "default_true")]
@@ -78,7 +93,8 @@ fn default_short_break_duration() -> usize { 5 }
 fn default_long_break_duration() -> usize { 15 }
 fn default_sessions_before_long_break() -> usize { 4 }
 fn default_theme() -> String { "auto".to_string() }
-fn default_layout() -> String { "classic".to_string() }
+fn default_layout() -> String { "focus".to_string() }
+fn default_daily_goal() -> u32 { 240 }
 fn default_effects() -> String { "none".to_string() }
 fn default_sound_start() -> String { "message-new-instant".to_string() }
 fn default_sound_end() -> String { "complete".to_string() }
@@ -123,12 +139,15 @@ impl Default for Config {
             long_break_duration: 15,
             sessions_before_long_break: 4,
             theme: default_theme(),
-            layout: "classic".to_string(),
+            layout: default_layout(),
             effects: "none".to_string(),
             notifications_enabled: true,
             sound_enabled: true,
             sound_start_event: "message-new-instant".to_string(),
             sound_end_event: "complete".to_string(),
+            autopilot: true,
+            daily_goal_minutes: default_daily_goal(),
+            wellness: WellnessConfig::default(),
             prompt_for_notes: true,
             pause_on_lock: true,
             pause_on_suspend: true,
@@ -208,12 +227,9 @@ impl Config {
             return Err("theme must be set".to_string());
         }
 
-        let valid_layouts = [
-            "classic", "minimal", "centered", "compact", "retro", "dashboard",
-            "monolith", "tinybar", "terminal-rice", "focus-stack", "command-center",
-            "random", "daily", "",
-        ];
-        if !valid_layouts.contains(&self.layout.as_str()) {
+        if !LAYOUT_NAMES.contains(&self.layout.as_str())
+            && !["random", "daily", ""].contains(&self.layout.as_str())
+        {
             return Err(format!("unknown layout: {:?}", self.layout));
         }
 
@@ -255,7 +271,7 @@ impl Config {
     }
 
     pub fn quick_focus_auto_advance(&self) -> bool {
-        self.quick_focus.auto_advance.unwrap_or(false)
+        self.quick_focus.auto_advance.unwrap_or(self.autopilot)
     }
 
     // Deep focus helpers

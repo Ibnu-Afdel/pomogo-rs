@@ -6,6 +6,7 @@ pub mod classic;
 pub mod command_center;
 pub mod compact;
 pub mod dashboard;
+pub mod focus;
 pub mod focus_stack;
 pub mod minimal;
 pub mod monolith;
@@ -40,6 +41,24 @@ pub struct DisplayState {
     pub zen: bool,
     pub git_branch: String,
     pub tmux_session: String,
+
+    // Focus companion details, used by the focus layout.
+    /// Focus time logged today, including the running segment.
+    pub today_focus: Duration,
+    /// Daily focus goal; zero when no goal is set.
+    pub daily_goal: Duration,
+    pub streak_days: usize,
+    pub water_today: usize,
+    /// One muted line about what comes next ("break in 12m · eyes in 4m").
+    pub next_up: String,
+    /// An active body reminder: (glyph, title, message).
+    pub nudge: Option<(String, String, String)>,
+    /// Something to do during the current break.
+    pub break_tip: String,
+    /// Context-sensitive key hints for the bottom row.
+    pub hints: String,
+    /// A short-lived message such as "Theme: nord" (empty when none).
+    pub toast: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,8 +75,15 @@ pub struct LayoutSpec {
     pub min_height: usize,
 }
 
-pub fn get_layout_specs() -> [(&'static str, LayoutSpec); 11] {
+/// Every selectable layout, in the order `L` cycles through them.
+pub const LAYOUT_NAMES: [&str; 12] = [
+    "focus", "classic", "minimal", "centered", "compact", "retro", "dashboard",
+    "monolith", "tinybar", "terminal-rice", "focus-stack", "command-center",
+];
+
+pub fn get_layout_specs() -> [(&'static str, LayoutSpec); 12] {
     [
+        ("focus", LayoutSpec { layout: focus::focus, min_width: 30, min_height: 8 }),
         ("classic", LayoutSpec { layout: classic::classic, min_width: 50, min_height: 16 }),
         ("minimal", LayoutSpec { layout: minimal::minimal, min_width: 40, min_height: 10 }),
         ("centered", LayoutSpec { layout: centered::centered, min_width: 50, min_height: 14 }),
@@ -85,7 +111,7 @@ pub fn resolve_layout(name: &str, width: usize, height: usize) -> (&'static str,
 
     // Preference fallback order for smaller terminals
     let order = [
-        "tinybar", "minimal", "compact", "focus-stack", "centered",
+        "focus", "tinybar", "minimal", "compact", "focus-stack", "centered",
         "classic", "dashboard", "monolith", "retro", "terminal-rice", "command-center",
     ];
 
@@ -102,10 +128,7 @@ pub fn resolve_layout(name: &str, width: usize, height: usize) -> (&'static str,
 }
 
 pub fn resolve_layout_name(configured: &str) -> String {
-    let layouts = [
-        "classic", "minimal", "centered", "compact", "retro", "dashboard",
-        "monolith", "tinybar", "terminal-rice", "focus-stack", "command-center",
-    ];
+    let layouts = LAYOUT_NAMES;
 
     if configured == "random" {
         let now_seed = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0) + std::process::id() as i64;
@@ -124,7 +147,7 @@ pub fn resolve_layout_name(configured: &str) -> String {
     }
 
     if configured.is_empty() {
-        return "classic".to_string();
+        return "focus".to_string();
     }
 
     configured.to_string()
@@ -179,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_resolve_layout_name() {
-        assert_eq!(resolve_layout_name(""), "classic");
+        assert_eq!(resolve_layout_name(""), "focus");
         assert_eq!(resolve_layout_name("monolith"), "monolith");
         let daily = resolve_layout_name("daily");
         assert!(!daily.is_empty());
@@ -188,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    fn test_all_11_layouts_render_without_panic() {
+    fn test_all_layouts_render_without_panic() {
         let th = crate::theme::get("tokyo-night");
         let frame = Frame {
             width: 90,
