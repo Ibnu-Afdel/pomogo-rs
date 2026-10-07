@@ -1,7 +1,6 @@
 // System health diagnostics and doctor command.
 
 use std::fs;
-use std::process::Command;
 
 use crate::config::{config_file_path, db_file_path, Config};
 use crate::statefile::xdg_runtime_dir;
@@ -86,7 +85,7 @@ pub fn run_doctor() -> Vec<Diagnostic> {
         passed: true,
         message: "notify-send is installed".to_string(),
     };
-    if Command::new("which").arg("notify-send").output().map(|o| o.status.success()).unwrap_or(false) {
+    if in_path("notify-send") {
         // passed
     } else {
         ns_diag.passed = false;
@@ -94,19 +93,18 @@ pub fn run_doctor() -> Vec<Diagnostic> {
     }
     diags.push(ns_diag);
 
-    // 5. Canberra Check
-    let mut sound_diag = Diagnostic {
-        name: "Canberra Sound Player (canberra-gtk-play)".to_string(),
-        passed: true,
-        message: "canberra-gtk-play is installed".to_string(),
-    };
-    if Command::new("which").arg("canberra-gtk-play").output().map(|o| o.status.success()).unwrap_or(false) {
-        // passed
-    } else {
-        sound_diag.passed = false;
-        sound_diag.message = "canberra-gtk-play not found in PATH (transition sounds will use terminal bell)".to_string();
-    }
-    diags.push(sound_diag);
+    // 5. Sound playback
+    let player = ["canberra-gtk-play", "pw-play", "paplay"]
+        .into_iter()
+        .find(|p| in_path(p));
+    diags.push(Diagnostic {
+        name: "Sound Player".to_string(),
+        passed: player.is_some(),
+        message: match player {
+            Some(p) => format!("{} found", p),
+            None => "no canberra-gtk-play, pw-play or paplay (sounds fall back to the terminal bell)".to_string(),
+        },
+    });
 
     // 6. External Themes Check
     let mut theme_diag = Diagnostic {
@@ -148,3 +146,9 @@ pub fn run_doctor() -> Vec<Diagnostic> {
     diags
 }
 
+
+fn in_path(name: &str) -> bool {
+    std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()))
+        .unwrap_or(false)
+}
