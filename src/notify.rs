@@ -142,7 +142,7 @@ impl Notifier {
             ),
             SessionState::LongBreak => (
                 "PomoGo — Long Break",
-                "You've earned it. Take 15 minutes to recharge.",
+                "You've earned it. Step away from the screen for a while.",
                 Urgency::Normal,
             ),
             SessionState::Idle => (
