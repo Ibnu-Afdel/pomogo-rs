@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, Local};
 use serde::Serialize;
-use crate::statefile::{is_expired, is_stale, State};
+use crate::statefile::{is_expired, is_stale, live_remaining_secs, State};
 
 #[derive(Debug, Serialize)]
 pub struct WaybarOutput {
@@ -40,9 +40,8 @@ pub fn format_status(state: Option<&State>, format: &str) -> Result<String, Stri
             format!("{:02}:{:02}", mins, secs)
         }
     } else {
-        let mins = st.remaining_secs / 60;
-        let secs = st.remaining_secs % 60;
-        format!("{:02}:{:02}", mins, secs)
+        let remaining = live_remaining_secs(st);
+        format!("{:02}:{:02}", remaining / 60, remaining % 60)
     };
 
     let (icon, class) = if st.paused {

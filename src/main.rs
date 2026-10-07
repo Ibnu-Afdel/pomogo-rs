@@ -13,7 +13,7 @@ use pomogo_rust::render::bigclock::ansi_fg;
 use pomogo_rust::render::{
     resolve_effects_name, resolve_layout, resolve_layout_name, DisplayState, Frame,
 };
-use pomogo_rust::statefile::StateManager;
+use pomogo_rust::statefile::{signal_running, RemoteAction, StateManager};
 use pomogo_rust::stats::calculate as calculate_stats;
 use pomogo_rust::store::models::Project;
 use pomogo_rust::store::Store;
@@ -107,6 +107,10 @@ enum Commands {
         #[arg(long, default_value = "default")]
         format: String,
     },
+    /// Start, pause or resume the running TUI (for bar clicks and keybindings)
+    Toggle,
+    /// Skip the running TUI to its next segment
+    Skip,
     /// Generate shell completion scripts
     Completion {
         /// Shell (bash, zsh, fish)
@@ -246,6 +250,8 @@ fn main() {
         }
         Some(Commands::Recap) => handle_recap(),
         Some(Commands::Status { format }) => handle_status(&format),
+        Some(Commands::Toggle) => handle_remote(RemoteAction::Toggle),
+        Some(Commands::Skip) => handle_remote(RemoteAction::Skip),
         Some(Commands::Completion { shell }) => handle_completion(&shell),
         Some(Commands::Projects { action }) => handle_projects(action),
         Some(Commands::Start {
@@ -496,6 +502,13 @@ fn handle_status(format: &str) {
     match format_status(state.as_ref(), format) {
         Ok(out) => println!("{}", out),
         Err(_) => println!("Idle"),
+    }
+}
+
+fn handle_remote(action: RemoteAction) {
+    if let Err(e) = signal_running(action) {
+        eprintln!("{}", e);
+        process::exit(1);
     }
 }
 

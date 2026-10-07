@@ -189,6 +189,51 @@ pub fn is_expired(state: &State) -> bool {
     now >= state.ends_at
 }
 
+/// Seconds left in the current segment, counted from `ends_at` while the
+/// timer runs so readers don't depend on the last heartbeat.
+pub fn live_remaining_secs(state: &State) -> i64 {
+    if !state.paused && state.ends_at > 0 {
+        (state.ends_at - Utc::now().timestamp()).max(0)
+    } else {
+        state.remaining_secs.max(0)
+    }
+}
+
+/// Remote actions understood by a running TUI.
+#[derive(Debug, Clone, Copy)]
+pub enum RemoteAction {
+    /// Start when idle, otherwise pause or resume.
+    Toggle,
+    /// Skip to the next segment.
+    Skip,
+}
+
+/// Sends `action` to the PomoGo TUI recorded in the state file.
+pub fn signal_running(action: RemoteAction) -> Result<u32, String> {
+    let state = StateManager::new()?
+        .read()?
+        .ok_or_else(|| "PomoGo is not running".to_string())?;
+    if is_stale(&state) || !is_pomogo_process(state.pid) {
+        return Err("PomoGo is not running".to_string());
+    }
+    let sig = match action {
+        RemoteAction::Toggle => libc::SIGUSR1,
+        RemoteAction::Skip => libc::SIGUSR2,
+    };
+    // SAFETY: kill(2) only reads its two integer arguments.
+    if unsafe { libc::kill(state.pid as libc::pid_t, sig) } != 0 {
+        return Err(format!("failed to signal PomoGo: {}", std::io::Error::last_os_error()));
+    }
+    Ok(state.pid)
+}
+
+/// Guards against PID reuse: only signal a process that is actually PomoGo.
+fn is_pomogo_process(pid: u32) -> bool {
+    fs::read_to_string(format!("/proc/{}/comm", pid))
+        .map(|comm| comm.trim().starts_with("pomogo"))
+        .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,6 +310,25 @@ mod tests {
         // Paused is not expired
         state.paused = true;
         assert!(!is_expired(&state));
+    }
+
+    #[test]
+    fn test_live_remaining_secs() {
+        let now = Utc::now().timestamp();
+        let mut state: State = serde_json::from_value(serde_json::json!({
+            "version": 2, "mode": "quick", "state": "work", "session_type": "work",
+            "ends_at": now + 90, "paused": false, "remaining_secs": 300, "pid": 1,
+            "session_count": 0, "updated_at": now - 30, "started_at": now - 60,
+            "total_secs": 1500
+        }))
+        .unwrap();
+        let live = live_remaining_secs(&state);
+        assert!((89..=90).contains(&live), "running timers count down from ends_at");
+        state.paused = true;
+        assert_eq!(live_remaining_secs(&state), 300);
+        state.paused = false;
+        state.ends_at = now - 5;
+        assert_eq!(live_remaining_secs(&state), 0);
     }
 }
 
