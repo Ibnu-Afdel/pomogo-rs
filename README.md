@@ -88,8 +88,9 @@ paused and hides when PomoGo is closed:
 - middle click: skip to the next segment
 
 Move it like any other widget, for example
-`omarchy bar move pomogo.timer --section right`. Its options (show the task
-name, show it while idle) are in Omarchy's bar settings.
+`omarchy bar move pomogo.timer --section right`. Its options (icon only or
+icon and time, show the task name, show it while idle) are in Omarchy's bar
+settings.
 
 **Theme.** With the default `theme = "auto"`, PomoGo uses the active Omarchy
 palette and repaints as soon as you switch themes.

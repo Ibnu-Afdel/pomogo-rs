@@ -39,8 +39,9 @@ It lands in the center of the bar. Move it with:
 omarchy bar move pomogo.timer --section right
 ```
 
-Its settings (show the task name, show the widget while PomoGo is idle) are in
-Omarchy's bar settings. If you have PomoGo installed, `pomogo omarchy install`
+Its settings (icon only or icon and time, show the task name, show the widget
+while PomoGo is idle) are in Omarchy's bar settings. With icon only, hover it
+for the time left. If you have PomoGo installed, `pomogo omarchy install`
 does the same as the `omarchy plugin add` command above.
 
 ## Update

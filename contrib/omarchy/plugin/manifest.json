@@ -18,10 +18,18 @@
     "allowMultiple": false,
     "defaultSection": "center",
     "defaults": {
+      "display": "Icon and time",
       "showTask": "Off",
       "whenIdle": "Hide"
     },
     "schema": [
+      {
+        "key": "display",
+        "type": "enum",
+        "label": "Show",
+        "options": ["Icon and time", "Icon only"],
+        "defaultValue": "Icon and time"
+      },
       {
         "key": "showTask",
         "type": "enum",

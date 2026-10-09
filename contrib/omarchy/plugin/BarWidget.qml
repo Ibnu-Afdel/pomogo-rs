@@ -32,6 +32,7 @@ BarWidget {
   readonly property bool onBreak: alive && !idle && pomo.session_type !== "work"
   readonly property bool showTask: String(setting("showTask", "Off")) === "On"
   readonly property bool showWhenIdle: String(setting("whenIdle", "Hide")) === "Show"
+  readonly property bool iconOnly: String(setting("display", "Icon and time")) === "Icon only"
 
   readonly property int remainingSecs: {
     if (!alive || idle) return 0
@@ -77,6 +78,7 @@ BarWidget {
   readonly property string labelText: {
     if (!alive) return ""
     if (idle) return showWhenIdle ? glyph : ""
+    if (iconOnly) return glyph
     if (vertical) return glyph + "\n" + clockText.split(":").slice(-2)[0]
     var label = glyph + " " + clockText
     if (showTask && taskText !== "") label += "  " + (taskText.length > 24 ? taskText.slice(0, 23) + "…" : taskText)
