@@ -252,6 +252,16 @@ impl Session {
         next
     }
 
+    /// Stops the running segment without advancing the phase, so the caller
+    /// can set up the next one and `start` it with fresh times.
+    pub fn stop(&mut self) {
+        self.is_running = false;
+        self.is_paused = false;
+        self.started_at = None;
+        self.ends_at = None;
+        self.paused_at = None;
+    }
+
     pub fn complete(&mut self) -> SessionState {
         if self.phase == SessionPhase::Work {
             self.session_count += 1;

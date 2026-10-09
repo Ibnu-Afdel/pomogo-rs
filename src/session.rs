@@ -322,6 +322,12 @@ impl Runner {
     }
 
     pub fn skip(&mut self, clock: &dyn Clock) -> (RunnerEvent, bool) {
+        if self.timer.phase == SessionPhase::Work {
+            self.timer.session_count += 1;
+        }
+        // Without this, start() below refuses ("already running") and the
+        // next segment inherits the skipped one's start and end times.
+        self.timer.stop();
         let (_next_seg, ok) = self.block.advance();
         if !ok {
             self.timer.reset();
@@ -396,6 +402,52 @@ mod tests {
         assert!(!plan.is_empty());
         let total: Duration = plan.iter().map(|s| s.duration).sum();
         assert_eq!(total, Duration::minutes(120));
+    }
+
+    fn quick_runner(auto_advance: bool) -> Runner {
+        Runner::new(Block::new_quick(
+            Duration::minutes(90),
+            Duration::minutes(20),
+            Duration::minutes(30),
+            2,
+            auto_advance,
+        ))
+    }
+
+    #[test]
+    fn skip_on_autopilot_starts_the_next_segment_fresh() {
+        let t0 = chrono::Utc::now();
+        let mut clock = crate::timer::MockClock::new(t0);
+        let mut runner = quick_runner(true);
+        runner.start(&clock).unwrap();
+
+        clock.current = t0 + Duration::minutes(10);
+        let (_, ok) = runner.skip(&clock);
+        assert!(ok);
+        assert_eq!(runner.timer.phase, SessionPhase::ShortBreak);
+        assert!(runner.timer.is_running);
+        assert_eq!(runner.timer.started_at, Some(clock.current));
+
+        // The break lasts its own 20 minutes, not the focus block's leftovers.
+        clock.current = t0 + Duration::minutes(29);
+        assert!(runner.tick(&clock).is_none());
+        assert_eq!(runner.timer.remaining_time, Duration::minutes(1));
+        clock.current = t0 + Duration::minutes(30);
+        assert!(runner.tick(&clock).is_some());
+        assert_eq!(runner.timer.phase, SessionPhase::Work);
+    }
+
+    #[test]
+    fn skip_without_autopilot_waits_for_start() {
+        let t0 = chrono::Utc::now();
+        let clock = crate::timer::MockClock::new(t0);
+        let mut runner = quick_runner(false);
+        runner.start(&clock).unwrap();
+        runner.skip(&clock);
+        assert_eq!(runner.timer.phase, SessionPhase::ShortBreak);
+        assert!(!runner.timer.is_running);
+        runner.start(&clock).unwrap();
+        assert_eq!(runner.timer.remaining_time, Duration::minutes(20));
     }
 }
 

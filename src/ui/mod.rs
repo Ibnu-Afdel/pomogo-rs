@@ -524,10 +524,17 @@ impl App {
                 if self.runner.timer.is_running || self.runner.timer.is_paused {
                     let prev_phase = self.runner.timer.phase;
                     let started_at = self.runner.timer.started_at.unwrap_or_else(Utc::now);
-                    let dur = self.runner.block.current_segment.duration;
+                    // A skipped segment counts only the time actually spent.
+                    let timer = &self.runner.timer;
+                    let left = match timer.ends_at {
+                        Some(ends) if !timer.is_paused => ends - Utc::now(),
+                        _ => timer.remaining_time,
+                    };
+                    let spent = (self.runner.block.current_segment.duration - left)
+                        .max(Duration::zero());
 
                     let (evt, _ok) = self.runner.skip(&clock);
-                    self.record_session(prev_phase, started_at, Utc::now(), false, dur);
+                    self.record_session(prev_phase, started_at, Utc::now(), false, spent);
                     self.refresh_today();
                     if evt.event_type != RunnerEventType::BlockEnded && self.runner.timer.phase != SessionPhase::Work {
                         self.begin_break();
