@@ -13,19 +13,19 @@ and today's progress toward your daily goal.
 
 | Action | What it does |
 |---|---|
-| Click | Open or focus PomoGo |
+| Click | Focus PomoGo's terminal (tmux included), or open PomoGo if it isn't running |
 | Right click | Start, pause or resume |
 | Middle click | Skip to the next focus or break |
 
 ## Requirements
 
 - Omarchy 4 (omarchy-shell).
-- The `pomogo` command, version 4.0 or newer, on your `PATH`. See the
+- The `pomogo` command, version 4.0.2 or newer, on your `PATH`. See the
   [PomoGo install instructions](https://github.com/Ibnu-Afdel/pomogo-rs#install).
 
 The widget runs no code of its own besides reading PomoGo's state file and
-calling `pomogo toggle`, `pomogo skip` and `omarchy-launch-or-focus-tui pomogo`
-when you click it.
+calling `pomogo focus`, `pomogo toggle`, `pomogo skip` and
+`omarchy-launch-or-focus-tui pomogo` when you click it.
 
 ## Install
 

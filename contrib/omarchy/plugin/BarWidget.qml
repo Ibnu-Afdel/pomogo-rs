@@ -152,7 +152,9 @@ BarWidget {
     onPressed: function(b) {
       if (b === Qt.RightButton) root.run("pomogo toggle")
       else if (b === Qt.MiddleButton) root.run("pomogo skip")
-      else root.run("omarchy-launch-or-focus-tui pomogo")
+      // `pomogo focus` finds PomoGo's terminal even when it was started by
+      // hand or inside tmux; launch a new one only when none is running.
+      else root.run("pomogo focus || omarchy-launch-or-focus-tui pomogo")
     }
   }
 }
