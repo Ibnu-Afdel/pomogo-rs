@@ -3,7 +3,7 @@ pub mod screens;
 
 use std::io::{stdout, Write};
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration as StdDuration, Instant, SystemTime};
 
@@ -264,8 +264,11 @@ impl App {
         let tick_interval = StdDuration::from_millis(250);
 
         let clock = RealClock;
+        let loop_beat = spawn_watchdog(Arc::clone(&quit_flag));
+        let loop_start = Instant::now();
 
         loop {
+            loop_beat.store(loop_start.elapsed().as_millis() as u64, Ordering::Relaxed);
             if quit_flag.load(Ordering::Relaxed) {
                 break;
             }
@@ -1447,3 +1450,27 @@ fn base64_encode(input: &str) -> String {
     out
 }
 
+
+/// Exits the process if the main loop stops turning.
+///
+/// When the terminal window goes away, crossterm 0.28 keeps retrying the dead
+/// tty inside `event::poll` and never returns, so the loop can't see the quit
+/// flag and PomoGo would spin forever in the background, still writing its
+/// state file for the bar widget. The loop stores its uptime in the returned
+/// counter on every turn (at least four times a second); this thread exits
+/// once that goes quiet: two seconds after SIGHUP/SIGTERM, or after twenty
+/// seconds of silence on its own.
+fn spawn_watchdog(quit_flag: Arc<AtomicBool>) -> Arc<AtomicU64> {
+    let beat = Arc::new(AtomicU64::new(0));
+    let seen = Arc::clone(&beat);
+    let start = Instant::now();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(StdDuration::from_millis(500));
+        let quiet_ms = (start.elapsed().as_millis() as u64).saturating_sub(seen.load(Ordering::Relaxed));
+        let limit_ms = if quit_flag.load(Ordering::Relaxed) { 2_000 } else { 20_000 };
+        if quiet_ms > limit_ms {
+            std::process::exit(0);
+        }
+    });
+    beat
+}
