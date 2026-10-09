@@ -253,6 +253,14 @@ pub fn signal_running(action: RemoteAction) -> Result<u32, String> {
     Ok(state.pid)
 }
 
+/// PID of another PomoGo TUI that is alive and still writing its heartbeat.
+pub fn running_pid() -> Option<u32> {
+    let state = StateManager::new().ok()?.read().ok()??;
+    let fresh = Utc::now().timestamp() - state.updated_at <= 5;
+    (fresh && state.pid != std::process::id() && !is_stale(&state) && is_pomogo_process(state.pid))
+        .then_some(state.pid)
+}
+
 /// Guards against PID reuse: only signal a process that is actually PomoGo.
 fn is_pomogo_process(pid: u32) -> bool {
     fs::read_to_string(format!("/proc/{}/comm", pid))

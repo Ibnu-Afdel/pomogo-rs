@@ -83,7 +83,7 @@ be managed by Omarchy's plugin manager instead:
 **Bar widget** (`pomogo.timer`). It shows the running segment, dims while
 paused and hides when PomoGo is closed:
 
-- click: open or focus PomoGo
+- click: focus PomoGo's terminal (also inside tmux), or open PomoGo
 - right click: start, pause or resume
 - middle click: skip to the next segment
 
@@ -149,6 +149,7 @@ pomogo [--theme T] [--layout L] [--effects E] [--task T] [--project P] [--work M
 pomogo setup                     answer the setup questions again
 pomogo start [profile|project]   start with a profile from config.toml or a project
 pomogo toggle | skip             control the running TUI (bars, keybindings)
+pomogo focus                     bring the running TUI's terminal to the front
 pomogo status [--format default|waybar|tmux|json]
 pomogo stats [--week|--month] | history | recap
 pomogo report [--start DATE --end DATE]

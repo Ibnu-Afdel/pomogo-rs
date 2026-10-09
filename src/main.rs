@@ -6,7 +6,7 @@ use clap::{Args, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 
 use pomogo_rust::config::{db_file_path, Config};
-use pomogo_rust::integrations::{format_status, run_doctor};
+use pomogo_rust::integrations::{focus_window_of, format_status, run_doctor};
 use pomogo_rust::omarchy::{
     install_desktop_entry, install_plugin, print_omarchy_status, uninstall_plugin, HYPRLAND_SNIPPET,
 };
@@ -16,7 +16,7 @@ use pomogo_rust::render::bigclock::ansi_fg;
 use pomogo_rust::render::{
     resolve_effects_name, resolve_layout, resolve_layout_name, DisplayState, Frame,
 };
-use pomogo_rust::statefile::{signal_running, RemoteAction, StateManager};
+use pomogo_rust::statefile::{running_pid, signal_running, RemoteAction, StateManager};
 use pomogo_rust::stats::{calculate as calculate_stats, local_midnight_utc};
 use pomogo_rust::store::models::Project;
 use pomogo_rust::store::Store;
@@ -147,6 +147,8 @@ enum Commands {
     Toggle,
     /// Skip the running TUI to its next segment
     Skip,
+    /// Bring the running TUI's terminal window to the front
+    Focus,
     /// Generate shell completion scripts
     Completion {
         /// Shell (bash, zsh, fish)
@@ -270,6 +272,7 @@ fn main() {
         Some(Commands::Setup) => handle_setup(),
         Some(Commands::Toggle) => handle_remote(RemoteAction::Toggle),
         Some(Commands::Skip) => handle_remote(RemoteAction::Skip),
+        Some(Commands::Focus) => handle_focus(),
         Some(Commands::Completion { shell }) => handle_completion(&shell),
         Some(Commands::Projects { action }) => handle_projects(action),
         Some(Commands::Start { target, launch }) => {
@@ -581,6 +584,20 @@ fn handle_remote(action: RemoteAction) {
     if let Err(e) = signal_running(action) {
         eprintln!("{}", e);
         process::exit(1);
+    }
+}
+
+fn handle_focus() {
+    match running_pid() {
+        Some(pid) if focus_window_of(pid) => {}
+        Some(pid) => {
+            eprintln!("PomoGo is running (pid {}), but not in a window this can focus.", pid);
+            process::exit(1);
+        }
+        None => {
+            eprintln!("PomoGo is not running");
+            process::exit(1);
+        }
     }
 }
 
