@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.0.1
+
+- Fixed: skipping a segment on autopilot kept the skipped segment's clock,
+  so a break started by skipping focus early ran for whatever was left of
+  the focus block. Skipped segments are now stored with the time actually
+  spent.
+- Fixed: closing the terminal window left PomoGo running in the background
+  at full CPU, and `kill` couldn't stop it. It now exits within two seconds.
+- The Omarchy widget has an icon-only option; hover it for the time left.
+
 ## 4.0.0
 
 PomoGo becomes a focus companion: set it up once, then it runs your day.
