@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.0.2
+
+- Fixed: clicking the Omarchy widget opened a second PomoGo when the first
+  was started by hand or inside tmux, and the widget then flickered between
+  the two. The click now focuses the running PomoGo.
+- Only one PomoGo runs at a time: launching it again switches to the
+  running one.
+- New `pomogo focus` brings the running PomoGo's terminal to the front,
+  switching tmux to its pane first.
+
 ## 4.0.1
 
 - Fixed: skipping a segment on autopilot kept the skipped segment's clock,

@@ -1306,7 +1306,7 @@ dependencies = [
 
 [[package]]
 name = "pomogo-rust"
-version = "4.0.1"
+version = "4.0.2"
 dependencies = [
  "arboard",
  "chrono",
