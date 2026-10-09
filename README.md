@@ -106,6 +106,10 @@ o.bind("SUPER + SHIFT + ALT + P", "PomoGo start/pause", "pomogo toggle")
 o.window("org.omarchy.pomogo", { tag = "+floating-window" })
 ```
 
+Only one PomoGo runs at a time: launching it again (from the keybinding,
+the widget or another terminal) switches to the one already running, even
+inside tmux.
+
 **Lock screen.** With `pause_on_lock = true`, the timer pauses while
 Omarchy's lock screen is up and resumes when you unlock.
 

@@ -706,6 +706,20 @@ fn run_app(target: Option<&str>, launch: LaunchArgs) {
         break_time,
         zen,
     } = launch;
+    // Two TUIs would fight over the state file (the bar widget flickers
+    // between them), so a second launch hands over to the first one.
+    if let Some(pid) = running_pid() {
+        if focus_window_of(pid) {
+            return;
+        }
+        eprintln!(
+            "PomoGo is already running (pid {}). Switch to that terminal, or use \
+             `pomogo toggle` / `pomogo skip`.",
+            pid
+        );
+        process::exit(1);
+    }
+
     // The first launch asks the setup questions so later launches just run.
     if setup::first_run() && setup::interactive() {
         if let Err(e) = setup::run(false) {
