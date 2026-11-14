@@ -195,8 +195,8 @@ impl Block {
             return Duration::zero();
         }
         let mut rem = seg_remaining;
-        for i in (self.index + 1)..self.segments.len() {
-            rem += self.segments[i].duration;
+        for seg in &self.segments[self.index + 1..] {
+            rem += seg.duration;
         }
         rem
     }

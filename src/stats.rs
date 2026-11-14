@@ -35,10 +35,10 @@ pub fn calculate(
     let today = now.date_naive();
 
     // Initialize 7 days ending today
-    for i in 0..7 {
+    for (i, slot) in stats.week_days.iter_mut().enumerate() {
         let offset = 6 - i;
         let d = today - Duration::days(offset as i64);
-        stats.week_days[i] = DayStats {
+        *slot = DayStats {
             date: d,
             count: 0,
             minutes: 0,
