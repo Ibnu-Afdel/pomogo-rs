@@ -12,7 +12,9 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 runner=""
-for candidate in qmltestrunner /usr/lib/qt6/bin/qmltestrunner /usr/lib/qt5/bin/qmltestrunner; do
+# Qt 6 only: the tests use versionless imports, which Qt 5's runner rejects.
+# The generic `qmltestrunner` on PATH is often Qt 5's, so try Qt 6 names first.
+for candidate in qmltestrunner6 /usr/lib/qt6/bin/qmltestrunner; do
   if command -v "$candidate" >/dev/null 2>&1; then
     runner="$(command -v "$candidate")"
     break
@@ -20,7 +22,7 @@ for candidate in qmltestrunner /usr/lib/qt6/bin/qmltestrunner /usr/lib/qt5/bin/q
 done
 
 if [[ -z "$runner" ]]; then
-  echo "qmltestrunner not found; install the Qt declarative package to run this suite" >&2
+  echo "Qt 6 qmltestrunner not found; install qt6-declarative to run this suite" >&2
   exit 127
 fi
 
