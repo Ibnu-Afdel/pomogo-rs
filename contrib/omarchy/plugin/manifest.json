@@ -13,14 +13,15 @@
   },
   "barWidget": {
     "displayName": "PomoGo",
-    "description": "Countdown of the running PomoGo session. Click to open, right click to pause or resume, middle click to skip.",
+    "description": "Countdown of the running PomoGo session. Click to open, right click to pause or resume, middle click to skip. Reports a missing pomogo command instead of disappearing.",
     "category": "Time",
     "allowMultiple": false,
     "defaultSection": "center",
     "defaults": {
       "display": "Icon and time",
       "showTask": "Off",
-      "whenIdle": "Hide"
+      "whenIdle": "Hide",
+      "whenMissing": "Show"
     },
     "schema": [
       {
@@ -43,6 +44,13 @@
         "label": "While PomoGo is open but not started",
         "options": ["Hide", "Show"],
         "defaultValue": "Hide"
+      },
+      {
+        "key": "whenMissing",
+        "type": "enum",
+        "label": "While the pomogo command is not installed",
+        "options": ["Show", "Hide"],
+        "defaultValue": "Show"
       }
     ]
   }
